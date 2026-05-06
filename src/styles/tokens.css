@@ -1,0 +1,10 @@
+/* Phase 0 placeholder. Real color tokens (Phase 1.A) replace this file
+   along with a tokens.json driving the contrast-audit script. AAA bar:
+     - body text >= 7:1 vs every background it appears on (1.4.6 AAA)
+     - non-text/UI >= 3:1 (1.4.11)
+     - focus ring >= 3:1 against both adjacent surfaces (2.4.13)
+   `prefers-contrast: more` overrides supply the AAA backstop where a token
+   cannot reach 7:1 in its base form. */
+:root {
+  color-scheme: light dark;
+}

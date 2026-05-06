@@ -1,0 +1,24 @@
+{
+  "name": "gitcite",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Single-file, client-side BibTeX reference manager with GitHub save. WCAG 2.2 AAA.",
+  "type": "module",
+  "scripts": {
+    "build": "bash tools/concat.sh",
+    "test:unit": "vitest run tests/unit",
+    "test:component": "vitest run tests/component",
+    "test:e2e": "playwright test",
+    "test:a11y": "playwright test --grep @a11y",
+    "test:all": "npm run test:unit && npm run build && npm run test:e2e",
+    "audit:contrast": "node tools/contrast-audit.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.48.0",
+    "@testing-library/dom": "^10.4.0",
+    "axe-core": "^4.10.0",
+    "jsdom": "^25.0.0",
+    "vitest": "^2.1.0"
+  }
+}

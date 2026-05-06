@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="GitCite — single-file, client-side academic reference manager.">
+  <title>Library — GitCite</title>
+  <!-- CONCAT:CSS:src/styles/tokens.css -->
+</head>
+<body>
+  <!--
+    AAA conformance ledger (DESIGN_SPEC §19). Each row is updated by the PR
+    that ships the relevant feature. Phase 0 lands the structural baseline:
+    landmarks, lang, title, viewport, color-scheme, skip link. AAA criteria
+    come into force per phase as features land.
+
+    | SC      | Status | Phase     | Note
+    |---------|--------|-----------|------------------------------------------
+    | 1.4.6   | open   | 1.A       | Token contrast matrix lands in Phase 1.A
+    | 2.2.3   | open   | 9         | OAuth device flow no-app-timeout
+    | 2.2.4   | open   | 1.C, 9    | Live-region throttle + announce.once
+    | 2.3.3   | open   | 1.A       | prefers-reduced-motion plumbing
+    | 2.4.10  | met    | 0         | Single H1, landmark structure
+    | 2.4.11  | open   | 1.B       | Focus appearance / not obscured
+    | 2.4.13  | open   | 1.A, 1.B  | >=2 CSS px focus ring, >=3:1 contrast
+    | 2.5.5   | open   | 1.H       | 44x44 hit-area utility + audit
+    | 3.1.1   | met    | 0         | <html lang="en">
+    | 3.1.3   | open   | 1.G       | Glossary/<abbr> on first use
+    | 3.1.4   | open   | 1.G       | <abbr title> for abbreviations
+    | 3.1.5   | open   | 1.G, 11   | Reading-level review of UI copy
+    | 3.2.5   | open   | 14, 15    | Auto-pull/auto-load gated on prefs
+    | 3.3.5   | open   | 1.F       | Shortcuts modal + glossary tooltips
+    | 3.3.6   | open   | 10        | Save flows reversible; typed confirm
+  -->
+
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header>
+    <h1>GitCite</h1>
+  </header>
+
+  <nav aria-label="Filters" hidden>
+    <!-- Sidebar filters (Phase 4) -->
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <!-- Library list, detail panel, edit form (Phases 4-5) -->
+  </main>
+
+  <aside aria-label="Detail" hidden>
+    <!-- Detail / edit pane (Phases 4-5) -->
+  </aside>
+
+  <footer>
+    <!-- Rate-limit / status line (Phase 6) -->
+  </footer>
+
+  <!-- CONCAT:JS:src/config.js -->
+</body>
+</html>
