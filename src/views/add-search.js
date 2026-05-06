@@ -124,21 +124,30 @@
     actions.appendChild(cancel);
     form.appendChild(actions);
 
-    // Error + status + results ------------------------------------------
+    // Error + status + recovery + results -------------------------------
     const error = document.createElement('div');
     error.setAttribute('data-search-error', '');
     error.setAttribute('role', 'alert');
     error.style.cssText = 'color:var(--danger);';
     form.appendChild(error);
 
+    // Phase 14 a11y-review (Major) — recovery actions live OUTSIDE the
+    // role="alert" region so the fallback button does not re-announce
+    // every time the alert mutates.
+    const recovery = document.createElement('div');
+    recovery.setAttribute('data-search-recovery', '');
+    form.appendChild(recovery);
+
     const status = document.createElement('div');
     status.setAttribute('data-search-status', '');
     status.setAttribute('role', 'status');
     form.appendChild(status);
 
+    // Phase 14 a11y-review (Major) — drop role="list" because result
+    // cards are <article> elements, not role="listitem". role="list"
+    // with non-listitem children produces "list with 0 items" in NVDA.
     const results = document.createElement('div');
     results.setAttribute('data-search-results', '');
-    results.setAttribute('role', 'list');
     form.appendChild(results);
 
     // Mode change handler -----------------------------------------------
@@ -155,12 +164,12 @@
     // Submit handler ----------------------------------------------------
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      runSearch({ form, input, provSelect, error, status, results, opts, handle });
+      runSearch({ form, input, provSelect, error, recovery, status, results, opts, handle });
     });
     submit.addEventListener('click', (e) => {
       // Without a real <form>.submit in jsdom we trigger the same handler.
       e.preventDefault();
-      runSearch({ form, input, provSelect, error, status, results, opts, handle });
+      runSearch({ form, input, provSelect, error, recovery, status, results, opts, handle });
     });
 
     // Initial focus on the input.
@@ -174,8 +183,9 @@
     return r ? r.value : 'keyword';
   }
 
-  async function runSearch({ form, input, provSelect, error, status, results, opts, handle }) {
+  async function runSearch({ form, input, provSelect, error, recovery, status, results, opts, handle }) {
     error.textContent = '';
+    if (recovery) recovery.innerHTML = '';
     results.innerHTML = '';
     const mode = currentMode(form);
     const query = (input.value || '').trim();
@@ -206,16 +216,16 @@
       // when the failure is on the Semantic Scholar path.
       if (code === 'rate-limit') {
         error.textContent = 'Semantic Scholar is rate-limiting this client. Try OpenAlex (better rate limits) or CrossRef.';
-        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
       } else if (code === 'forbidden') {
         error.textContent = 'Semantic Scholar requires an API key for this volume. Try OpenAlex or CrossRef.';
-        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
       } else if (code === 'network') {
         error.textContent = 'Network error reaching Semantic Scholar. Try OpenAlex or CrossRef.';
-        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
       } else if (code === 'parse') {
         error.textContent = 'Semantic Scholar returned malformed data.';
-        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
       } else {
         error.textContent = /malformed/i.test(msg) ? 'Malformed DOI — please re-check.' : msg;
       }
@@ -223,12 +233,16 @@
     }
   }
 
-  function renderFallback({ error, results, input, provSelect, status, opts, handle, mode }) {
+  function renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode }) {
+    const host = recovery || error;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.setAttribute('data-search-fallback', '');
     btn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-block-start:0.5rem;';
-    btn.textContent = 'Search via OpenAlex instead';
+    // Phase 14 a11y-review (Major) — descriptive label so the button
+    // stands alone in NVDA's "buttons" list and announces its recovery
+    // context.
+    btn.textContent = 'Retry this search using OpenAlex';
     btn.addEventListener('click', async () => {
       provSelect.value = 'openalex';
       error.textContent = '';
@@ -245,8 +259,10 @@
         status.textContent = '';
       }
     });
-    error.appendChild(document.createElement('br'));
-    error.appendChild(btn);
+    host.appendChild(btn);
+    // Move focus to the recovery button so keyboard users do not have
+    // to tab back into the form to find it.
+    setTimeout(() => { try { btn.focus(); } catch (_) {} }, 0);
   }
 
   function renderResults(host, out, opts, handle) {

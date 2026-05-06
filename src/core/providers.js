@@ -79,8 +79,15 @@
         continue;
       }
       if (r.status === 429) {
+        // Phase 14 a11y-review (Major) — vary the message per attempt
+        // so the polite-region's same-message throttle does not
+        // suppress useful progress information.
         if (globalThis.GitCiteAnnounce) {
-          globalThis.GitCiteAnnounce.polite('Semantic Scholar busy — retrying');
+          const nextWait = backoff[attempt + 1];
+          if (nextWait) {
+            const secs = Math.round(nextWait / 1000);
+            globalThis.GitCiteAnnounce.polite(`Semantic Scholar busy — retrying in ${secs} second${secs === 1 ? '' : 's'}`);
+          }
         }
         lastErr = Object.assign(new Error('Rate limited'), { code: 'rate-limit' });
         continue;

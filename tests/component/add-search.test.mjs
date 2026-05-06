@@ -169,5 +169,18 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     const fallback = document.querySelector('dialog [data-search-fallback]');
     expect(fallback).toBeTruthy();
     expect(fallback.textContent).toMatch(/OpenAlex/i);
+    // Phase 14 a11y-review (Major) — the fallback button must NOT be
+    // inside the role="alert" region (otherwise it re-announces with
+    // every alert mutation).
+    expect(fallback.closest('[role="alert"]')).toBeNull();
+    // Recovery container is the right host.
+    expect(fallback.closest('[data-search-recovery]')).toBeTruthy();
+  });
+
+  it('the results container does not advertise role="list" (cards are <article>, not listitem)', () => {
+    AddSearch.open({});
+    const results = document.querySelector('dialog [data-search-results]');
+    expect(results).toBeTruthy();
+    expect(results.getAttribute('role')).toBeNull();
   });
 });

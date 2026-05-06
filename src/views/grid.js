@@ -62,7 +62,8 @@
   let _headerRow = null;    // <tr> inside <thead>
   let _bodyGroup = null;    // <tbody>
   let _scrollHost = null;   // overflow:auto wrapper around <table>
-  let _spacer = null;
+  let _topSpacer = null;    // <tr aria-hidden> sized to the unrendered region above
+  let _bottomSpacer = null; // <tr aria-hidden> sized to the unrendered region below
 
   let _opts = {};
   let _entries = [];
@@ -77,11 +78,11 @@
   let _typeaheadBuf = '';
 
   // Phase 14 A.2 — guard against the scroll-listener re-render destroying
-  // the cell that focusCell() just placed focus on. When focusCell is the
-  // origin of the scroll, the keyboard path renders synchronously and
-  // marks this flag so the async scroll listener becomes a no-op for that
-  // event.
-  let _suppressScrollRender = 0;
+  // the cell that focusCell() just placed focus on. The keyboard path
+  // sets _expectedScroll to the value it asked for; the scroll listener
+  // skips render when actual scrollTop matches expectation (i.e., the
+  // synchronous keyboard render already handled this position).
+  let _expectedScroll = -1;
 
   function ids() { return globalThis.GitCiteIds; }
 
@@ -152,30 +153,52 @@
     });
 
     const tbody = document.createElement('tbody');
-    tbody.style.cssText = 'position:relative;';
     table.appendChild(tbody);
 
-    // Spacer trick: a single-row at the bottom of <tbody> with display:block
-    // wouldn't work inside a real <table>, so we use a sibling <div> sized
-    // to the full virtual height to drive the scroll host.
-    const spacer = document.createElement('div');
-    spacer.setAttribute('aria-hidden', 'true');
-    spacer.style.cssText = 'width:1px;';
+    // Phase 14 a11y-review (Critical 1) — virtualization via two
+    // <tr aria-hidden> spacer rows whose height matches the unrendered
+    // regions above and below the rendered window. This keeps the
+    // table's native semantics intact (no absolute positioning, no flex
+    // on rows/cells) so NVDA's Ctrl+Alt+arrow table-mode entry works.
+    const topSpacer = document.createElement('tr');
+    topSpacer.setAttribute('aria-hidden', 'true');
+    topSpacer.setAttribute('data-grid-spacer', 'top');
+    const topCell = document.createElement('td');
+    topCell.setAttribute('colspan', String(COLUMNS.length));
+    topCell.style.padding = '0';
+    topCell.style.border = '0';
+    topSpacer.appendChild(topCell);
+    tbody.appendChild(topSpacer);
+
+    const bottomSpacer = document.createElement('tr');
+    bottomSpacer.setAttribute('aria-hidden', 'true');
+    bottomSpacer.setAttribute('data-grid-spacer', 'bottom');
+    const bottomCell = document.createElement('td');
+    bottomCell.setAttribute('colspan', String(COLUMNS.length));
+    bottomCell.style.padding = '0';
+    bottomCell.style.border = '0';
+    bottomSpacer.appendChild(bottomCell);
+    tbody.appendChild(bottomSpacer);
 
     scrollHost.appendChild(table);
-    scrollHost.appendChild(spacer);
     host.appendChild(scrollHost);
 
     _table = table;
     _headerRow = headerRow;
     _bodyGroup = tbody;
     _scrollHost = scrollHost;
-    _spacer = spacer;
+    _topSpacer = topSpacer;
+    _bottomSpacer = bottomSpacer;
 
     table.addEventListener('keydown', onKeydown);
     table.addEventListener('click', onClick);
     scrollHost.addEventListener('scroll', () => {
-      if (_suppressScrollRender > 0) { _suppressScrollRender--; return; }
+      // Skip when the keyboard path already rendered for this scrollTop.
+      if (_expectedScroll >= 0 && Math.abs(_scrollHost.scrollTop - _expectedScroll) < 2) {
+        _expectedScroll = -1;
+        return;
+      }
+      _expectedScroll = -1;
       render();
     });
   }
@@ -185,7 +208,6 @@
     recomputeView();
     if (_focusRow >= _view.length) _focusRow = Math.max(HEADER_ROW, _view.length - 1);
     if (_table) _table.setAttribute('aria-rowcount', String(_view.length + 1));
-    if (_spacer) _spacer.style.height = (_view.length * ROW_HEIGHT) + 'px';
     render();
   }
 
@@ -228,9 +250,9 @@
     _focusRow = clamp(row, HEADER_ROW, Math.max(HEADER_ROW, _view.length - 1));
     _focusCol = clamp(col, 0, COLUMNS.length - 1);
     // ensureVisible() may set scrollTop, which fires an async scroll
-    // event that would normally trigger render(); flag it as suppressed
-    // since we render synchronously below.
-    if (ensureVisible()) _suppressScrollRender++;
+    // event. Record the value the keyboard path asked for so the scroll
+    // listener can no-op when the current scroll position matches.
+    if (ensureVisible()) _expectedScroll = _scrollHost.scrollTop;
     let target = findCell(_focusRow, _focusCol);
     if (!target) {
       render();
@@ -383,9 +405,7 @@
     if (!_table) return;
     const total = _view.length;
 
-    // Phase 14 A.2 — preserve focus across rebuilds. Capture the active
-    // cell's coordinates before clearing rows; after rebuild, find the
-    // new cell at the same coords and re-focus it.
+    // Phase 14 A.2 — preserve focus across rebuilds.
     let savedFocus = null;
     const ae = document.activeElement;
     if (ae && ae.getAttribute && ae.getAttribute('role') === 'gridcell' &&
@@ -396,10 +416,17 @@
       };
     }
 
-    const existing = _bodyGroup.querySelectorAll('tr[role="row"]');
+    // Remove every data row between the two spacer rows. The spacers
+    // remain in place so we don't fight the table layout.
+    const existing = _bodyGroup.querySelectorAll('tr[data-row]');
     existing.forEach((n) => n.remove());
 
-    if (total === 0) return;
+    if (total === 0) {
+      _topSpacer.firstChild.style.height = '0';
+      _bottomSpacer.firstChild.style.height = '0';
+      return;
+    }
+
     const vh = _scrollHost.clientHeight || (_host && _host.clientHeight) || 600;
     const scroll = _scrollHost.scrollTop || 0;
     const startIdx = Math.max(0, Math.floor(scroll / ROW_HEIGHT) - 5);
@@ -411,8 +438,17 @@
       if (_focusRow >= visEnd) visEnd = _focusRow + 1;
     }
 
+    // Spacer rows hold the unrendered regions' height. height on a <td>
+    // does not break native table semantics — it just sets the row
+    // height. Native NVDA table-mode entry continues to work.
+    _topSpacer.firstChild.style.height = (visStart * ROW_HEIGHT) + 'px';
+    _bottomSpacer.firstChild.style.height = ((total - visEnd) * ROW_HEIGHT) + 'px';
+
+    // Insert visible rows BEFORE the bottom spacer so they sit between
+    // the two spacers in DOM order — preserving aria-rowindex semantics
+    // (header is always row 1, data starts at 2).
     for (let i = visStart; i < visEnd; i++) {
-      _bodyGroup.appendChild(renderRow(_view[i], i));
+      _bodyGroup.insertBefore(renderRow(_view[i], i), _bottomSpacer);
     }
 
     if (savedFocus) {
@@ -426,13 +462,14 @@
   }
 
   function renderRow(entry, i) {
+    // Native table-row layout: no flex, no absolute positioning. NVDA's
+    // Ctrl+Alt+arrow table-mode entry depends on these intact.
     const row = document.createElement('tr');
     row.setAttribute('role', 'row');
     row.setAttribute('aria-rowindex', String(i + 2)); // 1 for header + 1-based
+    row.setAttribute('data-row', String(i));
     row.dataset.key = entry.key;
-    // Absolute positioning anchors the row to its virtual scroll position
-    // inside <tbody>; tbody has position:relative.
-    row.style.cssText = `position:absolute;top:${i * ROW_HEIGHT}px;left:0;right:0;display:flex;border-block-end:1px solid var(--border);min-block-size:${ROW_HEIGHT}px;`;
+    row.style.cssText = `border-block-end:1px solid var(--border);height:${ROW_HEIGHT}px;`;
     if (i === _focusRow) {
       row.style.background = 'var(--bg-elevated)';
     }
@@ -444,7 +481,7 @@
       cell.setAttribute('data-col', String(ci));
       const tabbable = (i === _focusRow && ci === _focusCol);
       cell.setAttribute('tabindex', tabbable ? '0' : '-1');
-      cell.style.cssText = `flex:1 1 0;min-width:120px;padding:0.5rem;min-block-size:44px;display:flex;align-items:center;cursor:pointer;`;
+      cell.style.cssText = `padding:0.5rem;min-width:120px;min-block-size:44px;cursor:pointer;vertical-align:middle;`;
       cell.textContent = col.get(entry);
       row.appendChild(cell);
     });

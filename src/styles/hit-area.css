@@ -21,3 +21,31 @@
 /* Native form controls already render >= 44 px in most modern browsers, but
    chips, badge buttons, and icon-only buttons do not. Apply .hit-44 to
    those — the audit will catch any drift. */
+
+/* Phase 14 a11y-review (Critical 2) — focusable visually-hidden H1.
+   Visually clipped by default; if the user focuses it (skip-link path),
+   reveal it briefly so browsers + screen readers reliably announce it.
+   Always rendered to the accessibility tree because no display:none. */
+.gitcite-sr-h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.gitcite-sr-h1:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.25rem 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  outline: 2px solid var(--focus-ring, currentColor);
+  outline-offset: 2px;
+}

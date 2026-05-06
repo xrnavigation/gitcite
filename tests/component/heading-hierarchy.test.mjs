@@ -24,8 +24,8 @@ describe('Phase 14 B — index.html shell (#10)', () => {
   });
 
   it('does not contain a GitCite tagline paragraph in the header', () => {
-    // Pull out the <header>...</header> block (single occurrence).
-    const m = HTML_SRC.match(/<header>[\s\S]*?<\/header>/);
+    // Pull out the <header ...>...</header> block (single occurrence).
+    const m = HTML_SRC.match(/<header\b[^>]*>[\s\S]*?<\/header>/);
     expect(m).toBeTruthy();
     const header = m[0];
     // No <h1> inside the persistent header.

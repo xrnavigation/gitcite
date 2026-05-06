@@ -322,15 +322,16 @@
 
     main.innerHTML = '';
 
-    // Phase 14 B.2 — every view's first heading inside <main> is an H1.
-    // Visually hidden because the visible heading slot is the library
-    // grid's caption + columnheaders, but kept structurally so skip-link
-    // users land on a real H1 and grid's aria-labelledby resolves.
+    // Phase 14 B.2 / a11y-review (Critical 2) — every view's first
+    // heading inside <main> is an H1. Uses the "focusable visually
+    // hidden" pattern: clipped by default, expanded to readable size
+    // while focused so screen readers reliably announce on skip-link
+    // activation in browsers that struggle with clip:rect on focus.
     const h1 = document.createElement('h1');
     h1.id = 'library-heading';
     h1.textContent = 'Library';
     h1.setAttribute('tabindex', '-1');
-    h1.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;';
+    h1.className = 'gitcite-sr-h1';
     main.appendChild(h1);
 
     const layout = document.createElement('div');
@@ -504,18 +505,19 @@
   // Phase 14 B.3 — when the user activates the skip link, move focus to
   // the H1 of the current view (which carries tabindex=-1) so screen
   // readers immediately announce "heading level 1, …" instead of just
-  // landing on the empty <main>.
+  // landing on the empty <main>. Always preventDefault so the URL hash
+  // stays clean; fall back to focusing <main> if no H1 exists yet
+  // (boot path before the first view renders).
   function setupSkipLink() {
     const skip = document.querySelector('.skip-link');
     if (!skip) return;
     skip.addEventListener('click', (e) => {
+      e.preventDefault();
       const main = document.querySelector('#main');
       if (!main) return;
       const h1 = main.querySelector('h1');
-      if (h1) {
-        e.preventDefault();
-        try { h1.focus(); } catch (_) {}
-      }
+      const target = h1 || main;
+      try { target.focus(); } catch (_) {}
     });
   }
 
