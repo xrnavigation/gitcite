@@ -29,6 +29,9 @@
     bibInput.accept = '.bib,text/plain';
     bibInput.style.cssText = 'position:absolute;left:-9999px;';
     bibInput.id = 'gitcite-bib-input';
+    bibInput.setAttribute('aria-label', 'Pick a .bib file');
+    bibInput.setAttribute('aria-hidden', 'true');
+    bibInput.tabIndex = -1;
     bibBtn.addEventListener('click', () => bibInput.click());
     bibInput.addEventListener('change', async () => {
       const f = bibInput.files && bibInput.files[0];
@@ -50,6 +53,9 @@
     csvInput.accept = '.csv,text/csv';
     csvInput.style.cssText = 'position:absolute;left:-9999px;';
     csvInput.id = 'gitcite-csv-input';
+    csvInput.setAttribute('aria-label', 'Pick a .csv file');
+    csvInput.setAttribute('aria-hidden', 'true');
+    csvInput.tabIndex = -1;
     csvBtn.addEventListener('click', () => csvInput.click());
     csvInput.addEventListener('change', async () => {
       const f = csvInput.files && csvInput.files[0];
