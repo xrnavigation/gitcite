@@ -12,28 +12,47 @@
 </head>
 <body>
   <!--
-    AAA conformance ledger (DESIGN_SPEC §19). Each row is updated by the PR
-    that ships the relevant feature. Phase 0 lands the structural baseline:
-    landmarks, lang, title, viewport, color-scheme, skip link. AAA criteria
-    come into force per phase as features land.
+    AAA conformance ledger (DESIGN_SPEC §19). Final audit after Phase 12.
+    Tests in tests/{unit,component,e2e} enforce these guarantees in CI.
 
-    | SC      | Status | Phase     | Note
-    |---------|--------|-----------|------------------------------------------
-    | 1.4.6   | open   | 1.A       | Token contrast matrix lands in Phase 1.A
-    | 2.2.3   | open   | 9         | OAuth device flow no-app-timeout
-    | 2.2.4   | open   | 1.C, 9    | Live-region throttle + announce.once
-    | 2.3.3   | open   | 1.A       | prefers-reduced-motion plumbing
-    | 2.4.10  | met    | 0         | Single H1, landmark structure
-    | 2.4.11  | open   | 1.B       | Focus appearance / not obscured
-    | 2.4.13  | open   | 1.A, 1.B  | >=2 CSS px focus ring, >=3:1 contrast
-    | 2.5.5   | open   | 1.H       | 44x44 hit-area utility + audit
-    | 3.1.1   | met    | 0         | <html lang="en">
-    | 3.1.3   | open   | 1.G       | Glossary/<abbr> on first use
-    | 3.1.4   | open   | 1.G       | <abbr title> for abbreviations
-    | 3.1.5   | open   | 1.G, 11   | Reading-level review of UI copy
-    | 3.2.5   | open   | 14, 15    | Auto-pull/auto-load gated on prefs
-    | 3.3.5   | open   | 1.F       | Shortcuts modal + glossary tooltips
-    | 3.3.6   | open   | 10        | Save flows reversible; typed confirm
+    | SC      | Status      | Phase    | Verification
+    |---------|-------------|----------|------------------------------------
+    | 1.1.1   | met         | 7        | Chart bars expose value via aria-label; plain-language captions per panel
+    | 1.3.1   | met         | 1.I, 4   | Field primitive + virtual list aria-posinset/setsize against full filtered count
+    | 1.3.5   | met         | 4, 5     | autocomplete + inputmode on year/ISBN inputs
+    | 1.4.1   | met         | 4, 6, 11 | Datasource badges, archival access, type labels — text labels never colour-only
+    | 1.4.6   | met         | 1.A      | Token contrast matrix audited in CI: 15 pairs × 2 themes pass
+    | 1.4.11  | met         | 1.A      | Borders + focus rings >= 3:1 in audit
+    | 1.4.13  | met         | 1.G      | Tooltips dismissible by Escape
+    | 2.1.4   | met         | 1.F      | Shortcut registry rejects single-character chords
+    | 2.2.1   | met         | 1.E, 10  | Action toasts duplicated to activity panel
+    | 2.2.3   | met         | 9, 10, 15| OAuth device flow — no app timeouts; auto-pull never auto-dismisses
+    | 2.2.4   | met         | 1.C, 9   | announce.polite throttle 500ms; user-code announce.once
+    | 2.3.3   | met         | 1.A      | prefers-reduced-motion flattens transitions globally
+    | 2.4.1   | met         | 0        | Skip link first focusable, targets #main
+    | 2.4.3   | met         | 1.B, 5   | focusUtils.moveFocusSafely; never lands on body
+    | 2.4.4   | met         | 5, 6     | Result-card invariant — heading-link + Select only
+    | 2.4.6   | met         | 0, 1     | One H1 per view; landmarks
+    | 2.4.7   | met         | 1.A      | :focus-visible ring on every interactive element
+    | 2.4.10  | met         | 0        | Heading hierarchies in panels, dialogs, forms
+    | 2.4.11  | met         | 1.B, 1.D | Focus not obscured by dialog backdrops; visible ring
+    | 2.4.13  | met         | 1.A      | 2 CSS px ring at >= 3:1 contrast
+    | 2.5.5   | met         | 1.H      | Playwright hit-area audit: 44x44 in both themes
+    | 2.5.7   | met         | 3        | Drop zone has keyboard substitute (Import .bib button precedes)
+    | 3.1.1   | met         | 0        | <html lang="en">
+    | 3.1.3   | met         | 1.G, 11  | Glossary tooltips on PAT, OAuth, SHA, JEL, LOC, DOI etc.
+    | 3.1.4   | met         | 1.G      | <abbr title> on first use per view
+    | 3.1.5   | met         | 1.G, 11  | UI copy reviewed against ninth-grade target
+    | 3.2.2   | met         | 1.D, 8   | Dialog backdrop click does NOT close by default; localhost tile insertion no-focus-steal
+    | 3.2.5   | met         | 14, 15   | Auto-pull/auto-load gated on prefs; Settings → Test connection for explicit probe
+    | 3.3.1   | met         | 1.I, 3, 5| Field primitive + error-summary; focus to first invalid
+    | 3.3.2   | met         | 5, 8     | Custom-field row Remove button: aria-label='Remove custom field {name}'
+    | 3.3.3   | met         | 1.I, 3   | aria-describedby chains help + error nodes
+    | 3.3.4   | met         | 4, 8, 10 | Delete typed-confirmation; conflict typed-confirmation
+    | 3.3.5   | met         | 1.F      | Shortcuts modal auto-populated from registry — single source of truth
+    | 3.3.6   | met         | 10       | All save flows reversible; .bib download fallback always present
+    | 4.1.2   | met         | all      | Real <button>/<a>; no role-on-div; aria-pressed on toggles
+    | 4.1.3   | met         | 1.C      | Singleton polite/assertive regions; throttled
   -->
 
   <a href="#main" class="skip-link">Skip to main content</a>
