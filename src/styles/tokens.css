@@ -1,10 +1,127 @@
-/* Phase 0 placeholder. Real color tokens (Phase 1.A) replace this file
-   along with a tokens.json driving the contrast-audit script. AAA bar:
+/* Phase 1.A — color tokens, theme system, motion preference (DESIGN_SPEC §13.5).
+   AAA targets enforced by tools/contrast-audit.mjs in CI:
      - body text >= 7:1 vs every background it appears on (1.4.6 AAA)
      - non-text/UI >= 3:1 (1.4.11)
-     - focus ring >= 3:1 against both adjacent surfaces (2.4.13)
-   `prefers-contrast: more` overrides supply the AAA backstop where a token
-   cannot reach 7:1 in its base form. */
+     - focus ring >= 3:1 against both adjacent surfaces (2.4.13) */
+
 :root {
   color-scheme: light dark;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+}
+
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elevated: #f4f4f5;
+  --bg-sunken: #e4e4e7;
+  --fg: #18181b;
+  --fg-muted: #3f3f46;
+  --border: #52525b;
+  --accent: #1e3a8a;
+  --accent-fg: #ffffff;
+  --danger: #991b1b;
+  --danger-fg: #ffffff;
+  --success: #14532d;
+  --success-fg: #ffffff;
+  --warning: #713f12;
+  --warning-fg: #ffffff;
+  --focus-ring: #1e40af;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a0a0b;
+  --bg-elevated: #18181b;
+  --bg-sunken: #050506;
+  --fg: #fafafa;
+  --fg-muted: #d4d4d8;
+  --border: #a1a1aa;
+  --accent: #bfdbfe;
+  --accent-fg: #0a0a0b;
+  --danger: #fecaca;
+  --danger-fg: #0a0a0b;
+  --success: #bbf7d0;
+  --success-fg: #0a0a0b;
+  --warning: #fde68a;
+  --warning-fg: #0a0a0b;
+  --focus-ring: #bfdbfe;
+}
+
+/* Hard-contrast backstop. If any token is below 7:1 in its base form, override
+   here to push it above. Currently every base token already passes; this block
+   is the WCAG 2.2 AAA escape hatch (1.4.6) for any token added later that
+   cannot reach 7:1. */
+@media (prefers-contrast: more) {
+  :root[data-theme="light"] {
+    --border: #18181b;
+    --focus-ring: #000000;
+  }
+  :root[data-theme="dark"] {
+    --border: #fafafa;
+    --focus-ring: #ffffff;
+  }
+}
+
+/* Reduced motion — flatten every transition and animation globally (2.3.3).
+   Decorative-only effects must not animate. Functional motion (e.g.,
+   virtual-list scroll smoothing) is also flattened — see ambiguity A1 in the
+   plan. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Base body styling — minimal in Phase 1.A; component CSS lands per phase. */
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Skip link — visible on focus only. Always reachable for keyboard users. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.75rem 1rem;
+  text-decoration: underline;
+  z-index: 9999;
+}
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+/* Focus appearance — >= 2 CSS px ring, >= 3:1 contrast (2.4.13).
+   :focus-visible only so mouse clicks do not show the ring. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Theme toggle styling — header sun/moon button. Phase 1.A delivers a
+   text-only button; iconography lands later. */
+.theme-toggle {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  cursor: pointer;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+}
+.theme-toggle:hover {
+  background: var(--bg-sunken);
 }
