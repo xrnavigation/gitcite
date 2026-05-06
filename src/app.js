@@ -55,13 +55,71 @@
     model.entries = result.entries.slice();
     model.dirty.clear();
     model.deleted.clear();
+    model.byKey.clear();
     for (const e of model.entries) model.byKey.set(e.key, e);
     Toast.show({
       message: `${model.entries.length} entries imported${result.skipped ? ', ' + result.skipped + ' skipped' : ''}`,
     });
     refreshPill();
+    renderLibraryView();
+  }
+
+  let _criteria = {};
+
+  function renderLibraryView() {
     const main = document.querySelector('#main');
-    if (main) main.innerHTML = `<p>Loaded ${model.entries.length} entries.</p>`;
+    const nav = document.querySelector('nav');
+    const aside = document.querySelector('aside');
+    if (!main) return;
+
+    main.innerHTML = '';
+    const layout = document.createElement('div');
+    layout.style.cssText = 'display:grid;grid-template-rows:auto 1fr;gap:0.5rem;height:80vh;';
+
+    const searchSlot = document.createElement('div');
+    layout.appendChild(searchSlot);
+
+    const listSlot = document.createElement('div');
+    listSlot.style.cssText = 'overflow:auto;height:100%;';
+    layout.appendChild(listSlot);
+
+    main.appendChild(layout);
+
+    if (nav) {
+      nav.hidden = false;
+      globalThis.GitCiteFilters.mount(nav, {
+        onChange: (c) => { _criteria = c; refreshList(); },
+      });
+    }
+    if (aside) {
+      aside.hidden = false;
+      globalThis.GitCiteDetail.mount(aside, {
+        onEdit: (e) => { Toast.show({ message: `Edit form for ${e.key} (Phase 5)` }); },
+        onDuplicate: (e) => { Toast.show({ message: `Duplicate ${e.key} (Phase 5)` }); },
+        onDelete: (e) => {
+          model.mutate(e, 'delete');
+          refreshPill();
+          refreshList();
+        },
+      });
+    }
+
+    globalThis.GitCiteSearchBar.mount(searchSlot, {
+      onChange: (q) => { _criteria = { ..._criteria, query: q }; refreshList(); },
+    });
+
+    globalThis.GitCiteList.mount(listSlot, {
+      onSelect: (e) => globalThis.GitCiteDetail.show(e),
+    });
+
+    refreshList();
+  }
+
+  function refreshList() {
+    const filtered = globalThis.GitCiteFilter.applyFilters(model.entries, _criteria);
+    globalThis.GitCiteList.update(filtered);
+    if (globalThis.GitCiteFilters) globalThis.GitCiteFilters.update(model.entries, _criteria);
+    globalThis.GitCiteFilters && globalThis.GitCiteFilters.ariaCount(filtered.length);
   }
 
   function importCsvText(text) {
