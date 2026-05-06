@@ -278,15 +278,35 @@
     });
   }
 
-  function importBibText(text) {
+  function importBibText(text, options) {
     const result = Bibtex.parse(text);
-    model.entries = result.entries.slice();
-    model.dirty.clear();
-    model.deleted.clear();
-    model.byKey.clear();
-    for (const e of model.entries) model.byKey.set(e.key, e);
+    const isAutoLoad = !!(options && options.fromAutoLoad);
+    if (isAutoLoad) {
+      // Phase 14 D.1 — auto-load is the upstream baseline. It must NOT
+      // populate the dirty set (otherwise every page load would create
+      // a phantom commit).
+      model.entries = result.entries.slice();
+      model.byKey.clear();
+      for (const e of model.entries) model.byKey.set(e.key, e);
+      model.dirty.clear();
+      model.deleted.clear();
+    } else {
+      // Phase 14 D.1 — user-initiated import. Each entry routes through
+      // mutate('add') so the unsaved-changes pill increments and Save
+      // Changes commits the whole import as a single git push.
+      let imported = 0;
+      let skipped = 0;
+      for (const e of result.entries) {
+        if (model.byKey.has(e.key)) { skipped++; continue; }
+        model.mutate(e, 'add');
+        imported++;
+      }
+      result.imported = imported;
+      result.skipped = (result.skipped || 0) + skipped;
+    }
+    const count = isAutoLoad ? model.entries.length : (result.imported != null ? result.imported : model.entries.length);
     Toast.show({
-      message: `${model.entries.length} entries imported${result.skipped ? ', ' + result.skipped + ' skipped' : ''}`,
+      message: `${count} entries imported${result.skipped ? ', ' + result.skipped + ' skipped' : ''}`,
     });
     refreshPill();
     renderLibraryView();
@@ -464,7 +484,9 @@
       const r = await fetch(cfg.autoLoad);
       if (!r.ok) return false;
       const text = await r.text();
-      importBibText(text);
+      // Phase 14 D.1 — auto-load is the upstream baseline; mark as such
+      // so importBibText does not write into the dirty set.
+      importBibText(text, { fromAutoLoad: true });
       return true;
     } catch (_) {
       return false;
