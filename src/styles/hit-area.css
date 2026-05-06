@@ -1,0 +1,23 @@
+/* Phase 1.H — hit-area utility. WCAG 2.5.5 (Target Size — Enhanced AAA).
+   Apply .hit-44 to any interactive element whose visual size is below
+   44 × 44 CSS px. The class enforces the minimum target size; the audit
+   in tests/e2e/hit-area.spec.mjs scans every interactive element on
+   every page and fails CI if any falls below the minimum. */
+
+.hit-44,
+.hit-44::before,
+.hit-44::after {
+  box-sizing: border-box;
+}
+
+.hit-44 {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Native form controls already render >= 44 px in most modern browsers, but
+   chips, badge buttons, and icon-only buttons do not. Apply .hit-44 to
+   those — the audit will catch any drift. */
