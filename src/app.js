@@ -125,12 +125,12 @@
     const quickBtn = document.createElement('button');
     quickBtn.type = 'button';
     quickBtn.setAttribute('data-empty-quick-add', '');
-    quickBtn.textContent = 'Quick Add by DOI';
+    quickBtn.textContent = 'Search and add';
     quickBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
     quickBtn.addEventListener('click', () => {
-      if (globalThis.GitCiteQuickAdd) {
-        globalThis.GitCiteQuickAdd.open({
-          onFetch: async () => { throw new Error('DOI lookup not configured.'); },
+      if (globalThis.GitCiteAddSearch) {
+        globalThis.GitCiteAddSearch.open({
+          onPick: (data) => onPickedResult(data),
         });
       }
     });
@@ -149,6 +149,30 @@
 
     addBtn.focus();
     if (Announce && Announce.polite) Announce.polite('Empty library. Add a citation or import a library.');
+  }
+
+  function onPickedResult(data) {
+    if (!data) return;
+    // Build a minimal entry from the picked result and route into the
+    // edit-form so the user can review/finalize. Citation key uses the
+    // existing collision-suffixed generator.
+    const fields = {};
+    if (data.title) fields.title = data.title;
+    if (data.authors) fields.author = data.authors;
+    if (data.year) fields.year = data.year;
+    if (data.venue) fields.journal = data.venue;
+    if (data.doi) fields.doi = data.doi;
+    if (data.abstract) fields.abstract = data.abstract;
+    if (data.url) fields.url = data.url;
+    const seedKey = (Bibtex && Bibtex.citationKey)
+      ? Bibtex.citationKey({ fields, type: 'article' }, model.byKey)
+      : 'imported-' + Date.now().toString(36);
+    const entry = { type: 'article', key: seedKey, fields };
+    model.mutate(entry, 'add');
+    refreshPill();
+    if (model.entries.length === 1) renderLibraryView();
+    else refreshList && refreshList();
+    Toast.show({ message: `Imported "${data.title || data.doi}"` });
   }
 
   function openNewEntryForm() {
@@ -239,16 +263,48 @@
       onChange: (q) => { _criteria = { ..._criteria, query: q }; refreshList(); },
     });
 
-    globalThis.GitCiteList.mount(listSlot, {
-      onSelect: (e) => globalThis.GitCiteDetail.show(e),
-    });
+    // Phase 13 Edit 2 — accessible role=grid library view (replaces
+    // the virtual list). Enter / F2 on a data row opens the row-action
+    // dialog (Edit 3 — wired in Phase 13.3).
+    if (globalThis.GitCiteGrid) {
+      globalThis.GitCiteGrid.mount(listSlot, {
+        onActivate: (entry) => {
+          if (globalThis.GitCiteRowAction) {
+            globalThis.GitCiteRowAction.open(entry, rowActionHandlers());
+          } else {
+            globalThis.GitCiteDetail.show(entry);
+          }
+        },
+      });
+    } else if (globalThis.GitCiteList) {
+      globalThis.GitCiteList.mount(listSlot, {
+        onSelect: (e) => globalThis.GitCiteDetail.show(e),
+      });
+    }
 
     refreshList();
   }
 
+  function rowActionHandlers() {
+    return {
+      onOpen: (entry) => globalThis.GitCiteDetail.show(entry),
+      onEdit: (entry) => Toast.show({ message: `Edit ${entry.key}` }),
+      onDuplicate: (entry) => Toast.show({ message: `Duplicate ${entry.key}` }),
+      onDelete: (entry) => {
+        model.mutate(entry, 'delete');
+        refreshPill();
+        refreshList();
+      },
+    };
+  }
+
   function refreshList() {
     const filtered = globalThis.GitCiteFilter.applyFilters(model.entries, _criteria);
-    globalThis.GitCiteList.update(filtered);
+    if (globalThis.GitCiteGrid) {
+      globalThis.GitCiteGrid.update(filtered);
+    } else if (globalThis.GitCiteList) {
+      globalThis.GitCiteList.update(filtered);
+    }
     if (globalThis.GitCiteFilters) globalThis.GitCiteFilters.update(model.entries, _criteria);
     globalThis.GitCiteFilters && globalThis.GitCiteFilters.ariaCount(filtered.length);
   }

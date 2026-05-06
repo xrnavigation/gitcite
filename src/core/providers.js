@@ -115,5 +115,49 @@
     return semanticScholar(opts);
   }
 
-  globalThis.GitCiteProviders = { search, _cacheClear: () => cache.clear() };
+  // Phase 13 Edit 1 — direct DOI lookup via CrossRef. Returns the same
+  // shape as search() so the result-card component can render it.
+  function normaliseDoi(input) {
+    if (!input || typeof input !== 'string') return null;
+    let s = input.trim();
+    s = s.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+    s = s.replace(/^doi:\s*/i, '');
+    if (!/^10\.\d{4,9}\//.test(s)) return null;
+    return s;
+  }
+
+  async function byDoi(input) {
+    const doi = normaliseDoi(input);
+    if (!doi) throw new Error('Malformed DOI');
+    const k = 'doi|' + doi;
+    const hit = getCached(k);
+    if (hit) return hit;
+    const url = new URL(`https://api.crossref.org/works/${doi}`);
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('DOI lookup failed: ' + r.status);
+    const data = await r.json();
+    const x = (data && data.message) || {};
+    const out = {
+      results: [{
+        title: (x.title || [])[0] || '',
+        authors: (x.author || [])
+          .map((a) => `${a.family || ''}, ${a.given || ''}`)
+          .map((s) => s.replace(/, $/, ''))
+          .filter((s) => s !== ', ' && s !== '')
+          .join(' and '),
+        venue: (x['container-title'] || [])[0] || '',
+        year: ((x.issued?.['date-parts'] || [[]])[0][0]) ? String(x.issued['date-parts'][0][0]) : '',
+        doi: x.DOI || doi,
+        abstract: x.abstract || '',
+        url: x.URL || `https://doi.org/${x.DOI || doi}`,
+        citations: null,
+        datasource: 'crossref-doi',
+      }],
+      total: 1,
+    };
+    setCached(k, out);
+    return out;
+  }
+
+  globalThis.GitCiteProviders = { search, byDoi, normaliseDoi, _cacheClear: () => cache.clear() };
 })();
