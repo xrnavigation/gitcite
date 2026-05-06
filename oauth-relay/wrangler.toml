@@ -1,0 +1,9 @@
+name = "gitcite-oauth-relay"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+# Set ALLOWED_ORIGIN to the deployed GitCite origin so CORS is restrictive:
+# wrangler secret put ALLOWED_ORIGIN
+# Set the OAuth App credentials as Worker secrets:
+# wrangler secret put GITHUB_OAUTH_CLIENT_ID
+# wrangler secret put GITHUB_OAUTH_CLIENT_SECRET
