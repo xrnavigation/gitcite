@@ -32,7 +32,9 @@
     if (_user) {
       const handle = _user.login ? `@${_user.login}` : '';
       _btn.textContent = handle ? `Signed in as ${handle}` : 'Signed in';
-      _btn.setAttribute('aria-haspopup', 'menu');
+      // Phase 13 a11y review (M3): the popped surface is the auth
+      // modal, not a real ARIA menu, so announce dialog semantics.
+      _btn.setAttribute('aria-haspopup', 'dialog');
       _btn.setAttribute('aria-expanded', 'false');
       _btn.setAttribute('aria-label', handle ? `GitHub account ${handle} — open account menu` : 'GitHub account — open account menu');
     } else {

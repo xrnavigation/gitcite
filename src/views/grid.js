@@ -104,10 +104,22 @@
       const h = document.createElement('div');
       h.setAttribute('role', 'columnheader');
       h.setAttribute('aria-sort', 'none');
+      h.setAttribute('aria-colindex', String(i + 1));
       h.setAttribute('tabindex', i === 0 ? '0' : '-1');
       h.setAttribute('data-row', String(HEADER_ROW));
       h.setAttribute('data-col', String(i));
-      h.textContent = col.label;
+      const label = document.createElement('span');
+      label.textContent = col.label;
+      h.appendChild(label);
+      // Phase 13 a11y review (V2): visible sort indicator. The arrow
+      // is decorative for AT (aria-sort already conveys state); the
+      // glyph is for sighted keyboard users.
+      const arrow = document.createElement('span');
+      arrow.setAttribute('data-sort-arrow', '');
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.style.cssText = 'margin-inline-start:0.25rem;';
+      arrow.textContent = '';
+      h.appendChild(arrow);
       h.style.cssText = 'min-block-size:44px;padding:0.5rem;font-weight:600;cursor:pointer;user-select:none;';
       headerRow.appendChild(h);
     });
@@ -228,13 +240,17 @@
       _sortCol = null;
       _sortDir = null;
     }
-    // Update aria-sort on every column header.
+    // Update aria-sort + visible arrow glyph on every column header.
     const headers = _headerRow.querySelectorAll('[role="columnheader"]');
     headers.forEach((h, i) => {
       const v = (i === _sortCol)
         ? (_sortDir === 'asc' ? 'ascending' : 'descending')
         : 'none';
       h.setAttribute('aria-sort', v);
+      const arrow = h.querySelector('[data-sort-arrow]');
+      if (arrow) {
+        arrow.textContent = v === 'ascending' ? ' ▲' : v === 'descending' ? ' ▼' : '';
+      }
     });
     if (globalThis.GitCiteAnnounce) {
       const colName = COLUMNS[col].label;
@@ -264,7 +280,13 @@
         return t.startsWith(_typeaheadBuf);
       });
     }
-    if (row >= 0) focusCell({ row, col: _focusCol });
+    if (row >= 0) {
+      focusCell({ row, col: _focusCol });
+    } else if (globalThis.GitCiteAnnounce) {
+      // Phase 13 a11y review (M1): on a no-match, give the user
+      // feedback so they know the keystroke was consumed.
+      globalThis.GitCiteAnnounce.polite(`No match for "${letter}"`);
+    }
   }
 
   function onKeydown(e) {
@@ -357,6 +379,7 @@
     COLUMNS.forEach((col, ci) => {
       const cell = document.createElement('div');
       cell.setAttribute('role', 'gridcell');
+      cell.setAttribute('aria-colindex', String(ci + 1));
       cell.setAttribute('data-row', String(i));
       cell.setAttribute('data-col', String(ci));
       const tabbable = (i === _focusRow && ci === _focusCol);

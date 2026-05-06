@@ -891,3 +891,126 @@ The glossary tooltips configured by `GITCITE_CONFIG.glossary = true` cover, at m
 - [Library of Congress Classification outline](https://www.loc.gov/catdir/cpso/lcco/)
 - [WAI-ARIA Authoring Practices Guide](https://www.w3.org/WAI/ARIA/apg/)
 - [WCAG 2.2 quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
+
+
+---
+
+## §21 — Phase 13 revisions
+
+After the Phase 12 release, eight UX/a11y issues were surfaced in user
+review. Several conflicted with foundational §1–§2 constraints
+(single-file ship, no client-side dependencies, AAA-grade error
+prevention, lazy auth) and required design decisions before
+implementation.
+
+### Decisions
+
+| # | Tension | Resolution |
+|---|---|---|
+| D1 | AG-Grid would violate §2 "no client-side dependencies" and balloon the artifact ~4×. | Built an in-house accessible grid (`src/views/grid.js`). Roving tabindex and Excel/Google-Sheets keyboard model, modeled on the WhatSock Dynamic Grid pattern. Stays single-file. |
+| D2 | Removing typed-confirm for delete drops AAA 3.3.4 / 3.3.6. | `<dialog role="alertdialog">` Cancel/Delete pair followed by a 30 s **Undo toast** persisted to the activity panel. Undo restores the entry from `model.deleted`. Reversibility now lives in the undo path plus the .bib download fallback at save time, so 3.3.6 stays "met". |
+| D3 | §14 says auth is lazy. User wants auth visible at startup. | Always-present **Sign in to GitHub** button in the header (`src/views/auth-toggle.js`). Lazy-auth contract preserved: read-only users are never forced through auth. |
+| D4 | Where the multi-mode search lives. | The Quick Add by DOI modal is replaced by a multi-mode search modal (`src/views/add-search.js`) with DOI / Title / Author / Keyword modes. DOI mode runs `providers.byDoi` (direct CrossRef `works/{doi}` lookup); the others go through the existing keyword-search providers. |
+
+### Spec amendments
+
+- **§2 (Core principles)** — restated as a hard constraint after D1: no
+  client-side dependencies in the shipped artifact. The accessible grid
+  is in-house code.
+- **§5.3 (Mutation buffering)** — extended with an undo stack
+  (`src/core/undo.js`). Each delete pushes an `{ id, undo }` entry. The
+  toast's **Undo** button calls `runById(id)` to restore via
+  `model.mutate(entry, 'add')`.
+- **§8.1 (Library list)** — replaced with **§8.1' Library grid**. The
+  virtual list is replaced by an accessible `role="grid"` view with
+  roving tabindex, six columns (Title, Authors, Year, Type, Datasource,
+  Saved), sortable column headers, and the Excel/Sheets keyboard model
+  documented in `SCREENS.md`. The HOTSPOT H1 invariant carries forward:
+  `aria-rowcount` reflects filtered + header, and every rendered row's
+  `aria-rowindex` reflects its position in the **full filtered count**,
+  not the rendered window.
+- **§9.3 (Quick Add)** — replaced with **§9.3' Multi-mode search modal**.
+  Modes DOI / Title / Author / Keyword. DOI mode uses `providers.byDoi`;
+  others route through the existing search providers. Result list uses
+  the result-card invariant; **Select** pre-fills via `onPick`.
+- **§10.1 (Providers)** — added `byDoi(doi)` returning the same
+  `{ results, total }` shape as `search()`. Strips `https://doi.org/`,
+  `https://dx.doi.org/`, `doi:` prefixes; rejects malformed DOIs without
+  a network call; caches by DOI for 5 minutes.
+- **§13.4 (Shortcuts) / §13.5 (Theme)** — entry-points moved from
+  global JS API / shortcut-only to visible buttons on the new header
+  toolbar. The Shortcuts modal still respects 2.1.4 (modifier required
+  for the `?` chord).
+- **§14 (Auth)** — visible **Sign in to GitHub** affordance in the
+  header (`src/views/auth-toggle.js`). When unauthenticated, click
+  opens the existing auth modal. When authenticated, the button
+  carries `aria-haspopup="menu"` and opens the sign-out / switch-method
+  / set-passphrase menu. Lazy-auth contract preserved — read-only
+  users not forced through auth.
+- **§14.5 (Save flow)** — visible **Save changes** button in the
+  header (`src/views/save-button.js`). Disabled when 0 pending changes.
+  Click and global Ctrl/Cmd+S route to the save flow. The button is
+  the user-facing complement to the unsaved-changes pill (count) so
+  the action is one Tab away from the count.
+- **§14.5 (Save flow, delete sub-clause)** — typed-confirmation for
+  delete is replaced with the simple-confirm + 30 s Undo toast pattern
+  described in D2 above. The .bib download fallback is unchanged.
+
+### §19 deviations register updates
+
+The conformance ledger comment at the top of `src/index.html` is
+updated by Phase 13 with these row changes:
+
+- **3.3.4 (Error Prevention All)** — mechanism changed from
+  typed-confirmation to `<alertdialog>` confirm + 30 s undo toast.
+  Status remains **met**; verification mechanism: tests/component/{
+  toast-action, undo, row-action-dialog}.test.mjs.
+- **3.3.6 (Error Prevention All — All Submissions)** — same change.
+  Status remains **met**; .bib download fallback at save time and undo
+  buffer cover the reversibility requirement.
+- **2.4.5 (Multiple Ways)** — new row, status **met**: every
+  formerly-orphaned screen now has a visible button on the header
+  toolbar AND retains its keyboard shortcut where applicable.
+- **1.3.1 (Info & Relationships)** — restated for grid: `role="grid"`,
+  `role="row"`, `role="columnheader"`, `role="gridcell"`,
+  `aria-rowcount`, `aria-rowindex`, `aria-colcount`, `aria-sort`.
+  Verification: tests/component/grid.test.mjs.
+- **2.1.1 (Keyboard)** — restated for grid (Excel/Sheets keys) and
+  toolbar (arrow-key nav). Verification: tests/component/{grid,
+  header-toolbar}.test.mjs.
+- **2.1.2 (No Keyboard Trap)** — restated for the row-action dialog
+  morph (Edit/Duplicate body swap does not trap focus; Cancel returns
+  to menu mode). Verification: tests/component/row-action-dialog.test.mjs.
+- **2.4.3 (Focus Order)** — restated for the disclosure helper
+  (Escape returns focus to the disclosure button) and the grid
+  (focus never lands on `<body>`; roving tabindex). Verification:
+  tests/component/{disclosure, grid}.test.mjs.
+- **3.2.4 (Consistent Identification)** — new row, status **met**:
+  the Save changes and Sign in buttons, the header toolbar, and the
+  unsaved-changes pill are present in identical position and labelling
+  across every view. Verification by visual inspection plus
+  tests/component/{save-button, auth-toggle, header-toolbar}.test.mjs.
+- **4.1.2 (Name, Role, Value)** — restated for: grid (`role="grid"`
+  with proper child roles), toolbar (`role="toolbar"` with `aria-label`),
+  add-search radio group, row-action dialog menu/morph buttons,
+  delete-confirm Cancel/Delete pair, save and auth-toggle buttons, and
+  the toast button-style action.
+- **4.1.3 (Status Messages)** — restated for sort-change polite
+  announcement, restored-after-undo announcement, and search status.
+
+### Test-suite delta
+
+Total component+unit tests: 286 → **+75 from Phase 12**.
+
+| Edit | New tests |
+|---|---|
+| 1 (multi-mode search + byDoi) | 6 unit + 9 component |
+| 2 (accessible grid) | 15 component |
+| 3 (row-action dialog) | 11 component |
+| 4 (undo + toast action) | 6 + 5 component |
+| 5 (save button) | 8 component |
+| 6 (disclosure helper) | 8 component |
+| 7 (auth toggle) | 8 component |
+| 8 (header toolbar) | 7 component |
+
+All green at the close of Phase 13.

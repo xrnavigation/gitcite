@@ -25,6 +25,10 @@
     const tb = document.createElement('div');
     tb.setAttribute('role', 'toolbar');
     tb.setAttribute('aria-label', 'Library actions');
+    // Phase 13 a11y review (M7): announce orientation, and bind ↑/↓
+    // as aliases for ←/→ since flex-wrap can stack the buttons on
+    // narrow viewports.
+    tb.setAttribute('aria-orientation', 'horizontal');
     tb.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.25rem;align-items:center;';
 
     const buttons = items.map((it, i) => {
@@ -54,8 +58,8 @@
     }
 
     tb.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') { e.preventDefault(); focusIndex(currentIndex() + 1); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); focusIndex(currentIndex() - 1); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); focusIndex(currentIndex() + 1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); focusIndex(currentIndex() - 1); }
       else if (e.key === 'Home') { e.preventDefault(); focusIndex(0); }
       else if (e.key === 'End') { e.preventDefault(); focusIndex(buttons.length - 1); }
     });

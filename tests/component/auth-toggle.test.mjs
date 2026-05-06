@@ -50,14 +50,16 @@ describe('Phase 13 Edit 7 — auth toggle', () => {
     expect(btn.style.minBlockSize || btn.style.minHeight).toMatch(/44/);
   });
 
-  it('setUser({ login }) switches to authenticated state with menu disclosure semantics', () => {
+  it('setUser({ login }) switches to authenticated state with dialog disclosure semantics', () => {
     const host = document.createElement('span');
     document.body.appendChild(host);
     AuthToggle.mount(host, {});
     AuthToggle.setUser({ login: 'octocat' });
     const btn = host.querySelector('button[data-auth-toggle]');
     expect(btn.textContent).toMatch(/octocat/);
-    expect(btn.getAttribute('aria-haspopup')).toBe('menu');
+    // Phase 13 a11y review (M3): the popped surface is the auth modal,
+    // not a real ARIA menu, so the button announces dialog semantics.
+    expect(btn.getAttribute('aria-haspopup')).toBe('dialog');
     expect(btn.getAttribute('aria-expanded')).toBe('false');
   });
 

@@ -37,6 +37,9 @@
   function applyState() {
     if (!_btn) return;
     _btn.disabled = _count === 0;
+    _btn.setAttribute('data-state', _count === 0 ? 'disabled' : 'enabled');
+    // Visual cue for sighted users: dim the button when disabled.
+    _btn.style.opacity = _count === 0 ? '0.6' : '1';
     if (_count > 0) {
       _btn.setAttribute('aria-label', `Save ${_count} change${_count === 1 ? '' : 's'} to GitHub`);
     } else {
@@ -51,7 +54,12 @@
     btn.type = 'button';
     btn.setAttribute('data-save-button', '');
     btn.textContent = 'Save changes';
-    btn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-start:0.5rem;';
+    // Phase 13 a11y review (V1): explicit disabled-state styling so
+    // the disabled appearance is perceivable in both themes
+    // (1.4.11 exempts disabled controls from contrast, but we still
+    // owe the user a clear visual cue).
+    btn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-start:0.5rem;border:1px solid var(--border);background:var(--bg-elevated);color:var(--fg);';
+    btn.setAttribute('data-state', 'disabled');
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
       if (typeof _opts.onSave === 'function') _opts.onSave();

@@ -182,7 +182,9 @@
       error.textContent = 'Search providers not loaded.';
       return;
     }
-    if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('Searching…');
+    // Phase 13 a11y review (M4): the status node is role=status, so
+    // updating its text content is the announcement — do not also call
+    // GitCiteAnnounce.polite (avoids double-announce).
     status.textContent = 'Searching…';
     try {
       const out = mode === 'doi'

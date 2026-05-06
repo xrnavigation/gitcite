@@ -48,8 +48,16 @@
 
     function clear() { body.innerHTML = ''; }
 
+    function setDialogRole(role) {
+      // Phase 13 a11y review (C3): the delete-confirm sub-step
+      // becomes role="alertdialog"; the menu/edit/duplicate modes
+      // use the default dialog role.
+      dialog.setAttribute('role', role);
+    }
+
     function showMenu() {
       clear();
+      setDialogRole('dialog');
       const titleId = nextId('row-action-title');
       const h = document.createElement('h2');
       h.id = titleId;
@@ -92,6 +100,7 @@
 
     function showEditMorph(isDuplicate) {
       clear();
+      setDialogRole('dialog');
       const seed = isDuplicate ? duplicateEntry(entry) : { ...entry, fields: { ...(entry.fields || {}) } };
       const titleId = nextId('row-action-form-title');
       const h = document.createElement('h2');
@@ -162,7 +171,9 @@
 
     function showDeleteConfirm() {
       clear();
+      setDialogRole('alertdialog');
       const titleId = nextId('row-action-delete-title');
+      const descId = nextId('row-action-delete-desc');
       const h = document.createElement('h2');
       h.id = titleId;
       h.textContent = `Delete ${entry.key}?`;
@@ -170,8 +181,10 @@
       setLabelledBy(titleId);
 
       const desc = document.createElement('p');
+      desc.id = descId;
       desc.textContent = 'This entry will be removed from your library. You can undo this for 30 seconds.';
       body.appendChild(desc);
+      dialog.setAttribute('aria-describedby', descId);
 
       const actions = document.createElement('div');
       actions.style.cssText = 'display:flex;gap:0.5rem;';

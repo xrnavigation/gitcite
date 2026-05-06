@@ -21,7 +21,13 @@
     if (!host) {
       host = document.createElement('div');
       host.setAttribute('data-toast-host', '');
-      host.setAttribute('aria-hidden', 'true'); // polite region carries SR copy
+      // Phase 13 a11y review (C1): the host is NOT aria-hidden because
+      // actionable toasts (e.g. Undo) live inside it and must be reachable
+      // by screen readers and keyboard users. Each toast carries its own
+      // aria-live channel via role=status; non-actionable toasts also
+      // duplicate via the singleton announcer.
+      host.setAttribute('role', 'region');
+      host.setAttribute('aria-label', 'Notifications');
       host.style.cssText = 'position:fixed;inset:auto 1rem 1rem auto;z-index:9000;display:flex;flex-direction:column;gap:0.5rem;';
       document.body.appendChild(host);
     }
@@ -110,6 +116,10 @@
     const toast = document.createElement('div');
     toast.setAttribute('data-toast', '');
     toast.setAttribute('data-severity', severity);
+    // Phase 13 a11y review (C1): toast carries its own role=status so
+    // SR users hear it and the Undo button is reachable through normal
+    // navigation rather than buried in an aria-hidden subtree.
+    toast.setAttribute('role', severity === 'error' ? 'alert' : 'status');
     toast.style.cssText = 'background:var(--bg-elevated);color:var(--fg);border:1px solid var(--border);padding:0.75rem 1rem;border-radius:4px;max-width:24rem;';
 
     const text = document.createElement('span');
