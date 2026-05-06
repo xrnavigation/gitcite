@@ -55,24 +55,27 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     expect(radios).toHaveLength(4);
     const labels = Array.from(radios).map((r) => r.value);
     expect(labels).toEqual(['doi', 'title', 'author', 'keyword']);
-    // DOI default
+    // Phase 14 #14 — Keyword is now the default (was DOI).
     const checked = Array.from(radios).find((r) => r.checked);
-    expect(checked.value).toBe('doi');
+    expect(checked.value).toBe('keyword');
   });
 
-  it('hides the provider select in DOI mode and shows it in non-DOI modes', () => {
+  it('shows the provider select in keyword (default) mode and hides it in DOI mode', () => {
     AddSearch.open({});
     const providerWrap = document.querySelector('dialog [data-provider-wrap]');
-    expect(providerWrap.hidden).toBe(true);
-    const titleRadio = document.querySelector('dialog [name="add-search-mode"][value="title"]');
-    titleRadio.checked = true;
-    titleRadio.dispatchEvent(new Event('change', { bubbles: true }));
     expect(providerWrap.hidden).toBe(false);
+    const doiRadio = document.querySelector('dialog [name="add-search-mode"][value="doi"]');
+    doiRadio.checked = true;
+    doiRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(providerWrap.hidden).toBe(true);
   });
 
   it('submit in DOI mode calls providers.byDoi with the input value', async () => {
     const { byDoi } = fakeProviders();
     AddSearch.open({});
+    const doiRadio = document.querySelector('dialog [name="add-search-mode"][value="doi"]');
+    doiRadio.checked = true;
+    doiRadio.dispatchEvent(new Event('change', { bubbles: true }));
     const input = document.querySelector('dialog input[data-search-input]');
     input.value = '10.1234/abc';
     document.querySelector('dialog [data-search-submit]').click();
@@ -98,8 +101,9 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
 
   it('renders results below the form using the result-card pattern', async () => {
     AddSearch.open({});
+    // Stay in default keyword mode — search() returns one result.
     const input = document.querySelector('dialog input[data-search-input]');
-    input.value = '10.1234/abc';
+    input.value = 'urban';
     document.querySelector('dialog [data-search-submit]').click();
     await new Promise((r) => setTimeout(r, 0));
     const cards = document.querySelectorAll('dialog [data-search-results] article');
@@ -115,7 +119,7 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     const onPick = vi.fn();
     AddSearch.open({ onPick });
     const input = document.querySelector('dialog input[data-search-input]');
-    input.value = '10.1234/abc';
+    input.value = 'urban';
     document.querySelector('dialog [data-search-submit]').click();
     await new Promise((r) => setTimeout(r, 0));
     document.querySelector('dialog [data-search-results] button').click();
@@ -128,7 +132,7 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
   it('mode change updates the input label visibly', () => {
     AddSearch.open({});
     const labelText = () => document.querySelector('dialog [data-search-input-label]').textContent;
-    expect(labelText()).toMatch(/DOI/i);
+    expect(labelText()).toMatch(/Keyword/i);
     const author = document.querySelector('dialog [name="add-search-mode"][value="author"]');
     author.checked = true;
     author.dispatchEvent(new Event('change', { bubbles: true }));
@@ -139,11 +143,31 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     fakeProviders();
     globalThis.GitCiteProviders.byDoi = vi.fn(async () => { throw new Error('Malformed DOI'); });
     AddSearch.open({});
+    const doiRadio = document.querySelector('dialog [name="add-search-mode"][value="doi"]');
+    doiRadio.checked = true;
+    doiRadio.dispatchEvent(new Event('change', { bubbles: true }));
     const input = document.querySelector('dialog input[data-search-input]');
     input.value = 'nope';
     document.querySelector('dialog [data-search-submit]').click();
     await new Promise((r) => setTimeout(r, 0));
     const err = document.querySelector('dialog [data-search-error]');
     expect(err.textContent).toMatch(/malformed|invalid/i);
+  });
+
+  it('renders a "Search via OpenAlex instead" fallback button on Semantic Scholar rate-limit', async () => {
+    const search = vi.fn(async () => {
+      throw Object.assign(new Error('Rate limited'), { code: 'rate-limit' });
+    });
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    const ss = document.querySelector('dialog [data-search-provider]');
+    ss.value = 'semanticscholar';
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const fallback = document.querySelector('dialog [data-search-fallback]');
+    expect(fallback).toBeTruthy();
+    expect(fallback.textContent).toMatch(/OpenAlex/i);
   });
 });

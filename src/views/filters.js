@@ -1,23 +1,61 @@
-// Phase 4 — sidebar filters. DESIGN_SPEC §8.3.
-// AND-combined criteria over the in-memory model. Discipline: filter
-// changes announce through the SHARED polite live region — never a
-// per-filter region (hotspot H13). Clear filters refocuses the search input.
+// Phase 4 / Phase 14 Group C — sidebar filters. DESIGN_SPEC §8.3.
+// AND-combined criteria over the in-memory model. Filter changes
+// announce through the SHARED polite live region — never a per-filter
+// region (hotspot H13). Clear filters refocuses the search input.
+//
+// Phase 14 #4 — the filter set sits inside a collapsed-by-default
+// disclosure under the search box. Open state persists in localStorage
+// (gitcite.filtersOpen).
 
 (function () {
   'use strict';
 
   if (globalThis.GitCiteFilters) return;
 
+  const STATE_KEY = 'gitcite.filtersOpen';
+
   let _host = null;
   let _opts = {};
   let _criteria = {};
   let _entries = [];
+  let _disclosureBtn = null;
+  let _disclosureRegion = null;
+
+  function isOpen() {
+    try { return localStorage.getItem(STATE_KEY) === 'true'; } catch (_) { return false; }
+  }
+  function setOpen(open) {
+    try { localStorage.setItem(STATE_KEY, open ? 'true' : 'false'); } catch (_) {}
+  }
 
   function mount(host, opts) {
     _host = host;
     _opts = opts || {};
     host.innerHTML = '';
     host.setAttribute('aria-label', 'Filters');
+
+    const expanded = isOpen();
+    const D = globalThis.GitCiteDisclosure;
+    if (!D) {
+      // Disclosure helper missing — fall back to inline rendering so
+      // tests that don't load it don't crash.
+      _disclosureRegion = document.createElement('div');
+      _disclosureRegion.setAttribute('data-filters-region', '');
+      host.appendChild(_disclosureRegion);
+      return;
+    }
+    const dis = D.create({
+      label: 'Filters',
+      expanded,
+    });
+    dis.button.setAttribute('data-filters-disclosure', '');
+    dis.region.setAttribute('data-filters-region', '');
+    dis.button.addEventListener('click', () => {
+      setOpen(dis.button.getAttribute('aria-expanded') === 'true');
+    });
+    _disclosureBtn = dis.button;
+    _disclosureRegion = dis.region;
+    host.appendChild(dis.wrap);
   }
 
   function update(entries, criteria) {
@@ -41,8 +79,8 @@
   }
 
   function render() {
-    if (!_host) return;
-    _host.innerHTML = '';
+    if (!_disclosureRegion) return;
+    _disclosureRegion.innerHTML = '';
     const F = globalThis.GitCiteFilter;
     if (!F) return;
 
@@ -51,13 +89,13 @@
     const jels = F.listJEL(_entries);
     const lccs = F.listLCC(_entries);
 
-    _host.appendChild(renderTypeFilter(types));
-    _host.appendChild(renderYearFilter());
-    if (jels.length) _host.appendChild(renderSelectFilter('JEL code', 'jel', jels));
-    if (lccs.length) _host.appendChild(renderSelectFilter('LCC class', 'lcc', lccs));
-    if (datasources.length) _host.appendChild(renderSelectFilter('Datasource', 'datasource', datasources));
+    _disclosureRegion.appendChild(renderTypeFilter(types));
+    _disclosureRegion.appendChild(renderYearFilter());
+    if (jels.length) _disclosureRegion.appendChild(renderSelectFilter('JEL code', 'jel', jels));
+    if (lccs.length) _disclosureRegion.appendChild(renderSelectFilter('LCC class', 'lcc', lccs));
+    if (datasources.length) _disclosureRegion.appendChild(renderSelectFilter('Datasource', 'datasource', datasources));
 
-    _host.appendChild(renderClear());
+    _disclosureRegion.appendChild(renderClear());
   }
 
   function renderTypeFilter(items) {

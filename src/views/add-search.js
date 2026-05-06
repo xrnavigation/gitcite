@@ -54,7 +54,9 @@
       r.name = 'add-search-mode';
       r.value = mode.value;
       r.id = id;
-      if (mode.value === 'doi') r.checked = true;
+      // Phase 14 #14 — Keyword is the default mode (was DOI). Most users
+      // search by keyword/title/author; DOI is the exception, not the rule.
+      if (mode.value === 'keyword') r.checked = true;
       wrap.appendChild(r);
       wrap.appendChild(document.createTextNode(' ' + mode.label));
       fs.appendChild(wrap);
@@ -62,10 +64,11 @@
     form.appendChild(fs);
 
     // Input -------------------------------------------------------------
+    const initialMode = MODES.find((m) => m.value === 'keyword');
     const inputWrap = document.createElement('div');
     const inputLabel = document.createElement('label');
     inputLabel.setAttribute('data-search-input-label', '');
-    inputLabel.textContent = 'DOI';
+    inputLabel.textContent = initialMode.inputLabel;
     const inputId = 'add-search-input';
     inputLabel.setAttribute('for', inputId);
     const input = document.createElement('input');
@@ -73,7 +76,7 @@
     input.type = 'search';
     input.setAttribute('data-search-input', '');
     input.setAttribute('autocomplete', 'off');
-    input.placeholder = MODES[0].placeholder;
+    input.placeholder = initialMode.placeholder;
     inputWrap.appendChild(inputLabel);
     inputWrap.appendChild(document.createElement('br'));
     inputWrap.appendChild(input);
@@ -82,7 +85,8 @@
     // Provider select (non-DOI modes only) ------------------------------
     const providerWrap = document.createElement('div');
     providerWrap.setAttribute('data-provider-wrap', '');
-    providerWrap.hidden = true;
+    // Default mode is keyword → provider select visible.
+    providerWrap.hidden = false;
     const provLabel = document.createElement('label');
     provLabel.textContent = 'Provider';
     const provId = 'add-search-provider';
@@ -90,7 +94,10 @@
     const provSelect = document.createElement('select');
     provSelect.id = provId;
     provSelect.setAttribute('data-search-provider', '');
-    for (const [v, l] of [['semanticscholar', 'Semantic Scholar'], ['openalex', 'OpenAlex'], ['crossref', 'CrossRef']]) {
+    // Phase 14 C.4 — OpenAlex is the default. Semantic Scholar's
+    // unauthenticated endpoint rate-limits to ~1 req/sec and is unreliable
+    // as a default; users can still pick it explicitly.
+    for (const [v, l] of [['openalex', 'OpenAlex'], ['crossref', 'CrossRef'], ['semanticscholar', 'Semantic Scholar']]) {
       const o = document.createElement('option');
       o.value = v; o.textContent = l;
       provSelect.appendChild(o);
@@ -106,7 +113,7 @@
     const submit = document.createElement('button');
     submit.type = 'submit';
     submit.setAttribute('data-search-submit', '');
-    submit.textContent = 'Look up DOI';
+    submit.textContent = 'Search';
     submit.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
     actions.appendChild(submit);
     const cancel = document.createElement('button');
@@ -164,7 +171,7 @@
 
   function currentMode(form) {
     const r = form.querySelector('input[name="add-search-mode"]:checked');
-    return r ? r.value : 'doi';
+    return r ? r.value : 'keyword';
   }
 
   async function runSearch({ form, input, provSelect, error, status, results, opts, handle }) {
@@ -189,14 +196,57 @@
     try {
       const out = mode === 'doi'
         ? await Providers.byDoi(query)
-        : await Providers.search({ provider: provSelect.value, query, limit: 10, offset: 0 });
+        : await Providers.search({ provider: provSelect.value, mode, query, limit: 10, offset: 0 });
       status.textContent = `${out.results.length} of ${out.total} results`;
       renderResults(results, out, opts, handle);
     } catch (e) {
       const msg = (e && e.message) || 'Search failed';
-      error.textContent = /malformed/i.test(msg) ? 'Malformed DOI — please re-check.' : msg;
+      const code = e && e.code;
+      // Phase 14 C.4 — distinct error messages + fallback to OpenAlex
+      // when the failure is on the Semantic Scholar path.
+      if (code === 'rate-limit') {
+        error.textContent = 'Semantic Scholar is rate-limiting this client. Try OpenAlex (better rate limits) or CrossRef.';
+        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+      } else if (code === 'forbidden') {
+        error.textContent = 'Semantic Scholar requires an API key for this volume. Try OpenAlex or CrossRef.';
+        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+      } else if (code === 'network') {
+        error.textContent = 'Network error reaching Semantic Scholar. Try OpenAlex or CrossRef.';
+        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+      } else if (code === 'parse') {
+        error.textContent = 'Semantic Scholar returned malformed data.';
+        renderFallback({ error, results, input, provSelect, status, opts, handle, mode });
+      } else {
+        error.textContent = /malformed/i.test(msg) ? 'Malformed DOI — please re-check.' : msg;
+      }
       status.textContent = '';
     }
+  }
+
+  function renderFallback({ error, results, input, provSelect, status, opts, handle, mode }) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('data-search-fallback', '');
+    btn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-block-start:0.5rem;';
+    btn.textContent = 'Search via OpenAlex instead';
+    btn.addEventListener('click', async () => {
+      provSelect.value = 'openalex';
+      error.textContent = '';
+      btn.remove();
+      status.textContent = 'Searching…';
+      try {
+        const out = await globalThis.GitCiteProviders.search({
+          provider: 'openalex', mode, query: input.value.trim(), limit: 10, offset: 0,
+        });
+        status.textContent = `${out.results.length} of ${out.total} results`;
+        renderResults(results, out, opts, handle);
+      } catch (e) {
+        error.textContent = (e && e.message) || 'OpenAlex search failed';
+        status.textContent = '';
+      }
+    });
+    error.appendChild(document.createElement('br'));
+    error.appendChild(btn);
   }
 
   function renderResults(host, out, opts, handle) {
