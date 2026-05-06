@@ -44,7 +44,79 @@
       });
     }
     setupAuthToggle();
+    setupHeaderToolbar();
     refreshPill();
+  }
+
+  function setupHeaderToolbar() {
+    const host = document.querySelector('[data-toolbar-host]');
+    if (!host || !globalThis.GitCiteHeaderToolbar) return;
+    const items = [
+      { id: 'library', label: 'Library' },
+      { id: 'add-citation', label: 'Add citation' },
+      { id: 'search-providers', label: 'Search providers' },
+      { id: 'find-replace', label: 'Find / Replace' },
+      { id: 'insights', label: 'Insights' },
+      { id: 'stats', label: 'Stats' },
+      { id: 'shortcuts', label: 'Shortcuts' },
+      { id: 'about', label: 'About' },
+      { id: 'reload-library', label: 'Reload library' },
+    ];
+    globalThis.GitCiteHeaderToolbar.mount(host, {
+      items,
+      onAction: (id) => onToolbarAction(id),
+    });
+  }
+
+  function onToolbarAction(id) {
+    switch (id) {
+      case 'library':
+        if (model.entries.length === 0) showEmptyLibrary();
+        else renderLibraryView();
+        return;
+      case 'add-citation':
+        if (globalThis.GitCiteAddSearch) {
+          globalThis.GitCiteAddSearch.open({ onPick: (data) => onPickedResult(data) });
+        }
+        return;
+      case 'search-providers':
+        if (globalThis.GitCiteKeywordSearch && typeof globalThis.GitCiteKeywordSearch.open === 'function') {
+          globalThis.GitCiteKeywordSearch.open({});
+        } else if (globalThis.GitCiteAddSearch) {
+          // Fall back to the multi-mode search with non-DOI default.
+          globalThis.GitCiteAddSearch.open({ onPick: (data) => onPickedResult(data) });
+        }
+        return;
+      case 'find-replace':
+        if (globalThis.GitCiteFindReplace && typeof globalThis.GitCiteFindReplace.open === 'function') {
+          globalThis.GitCiteFindReplace.open({ entries: model.entries });
+        }
+        return;
+      case 'insights':
+        if (globalThis.GitCiteInsights && typeof globalThis.GitCiteInsights.open === 'function') {
+          globalThis.GitCiteInsights.open(model.entries);
+        }
+        return;
+      case 'stats':
+        if (globalThis.GitCiteInsights && typeof globalThis.GitCiteInsights.open === 'function') {
+          // Stats is co-located with Insights; this opens the same modal.
+          globalThis.GitCiteInsights.open(model.entries);
+        }
+        return;
+      case 'shortcuts':
+        if (globalThis.GitCiteShortcutsModal && typeof globalThis.GitCiteShortcutsModal.open === 'function') {
+          globalThis.GitCiteShortcutsModal.open();
+        }
+        return;
+      case 'about':
+        if (globalThis.GitCiteAbout && typeof globalThis.GitCiteAbout.open === 'function') {
+          globalThis.GitCiteAbout.open();
+        }
+        return;
+      case 'reload-library':
+        showLanding();
+        return;
+    }
   }
 
   function setupAuthToggle() {
@@ -256,6 +328,18 @@
           refreshPill();
           refreshList();
         },
+        // Phase 13 Edit 4 — undo callback wired to the toast Undo button.
+        onRestore: (e) => {
+          // Re-add via mutate('add') after delete; clears the deleted set.
+          try {
+            model.mutate(e, 'add');
+          } catch (_) {
+            // If the key already exists (rare race), treat as a no-op.
+          }
+          refreshPill();
+          refreshList();
+          if (Announce) Announce.polite(`Restored ${e.key}`);
+        },
       });
     }
 
@@ -288,12 +372,45 @@
   function rowActionHandlers() {
     return {
       onOpen: (entry) => globalThis.GitCiteDetail.show(entry),
-      onEdit: (entry) => Toast.show({ message: `Edit ${entry.key}` }),
-      onDuplicate: (entry) => Toast.show({ message: `Duplicate ${entry.key}` }),
+      onEdit: (entry) => {
+        try { model.mutate(entry, 'update'); } catch (_) {}
+        refreshPill();
+        refreshList();
+        Toast.show({ message: `Saved ${entry.key}` });
+      },
+      onDuplicate: (entry) => {
+        try { model.mutate(entry, 'add'); } catch (_) {}
+        refreshPill();
+        refreshList();
+        Toast.show({ message: `Duplicated as ${entry.key}` });
+      },
       onDelete: (entry) => {
+        // Phase 13 Edit 4 — undo flow.
         model.mutate(entry, 'delete');
         refreshPill();
         refreshList();
+        const id = 'undo-row-' + entry.key + '-' + Date.now().toString(36);
+        if (globalThis.GitCiteUndo) {
+          globalThis.GitCiteUndo.push({
+            id,
+            undo: () => {
+              try { model.mutate(entry, 'add'); } catch (_) {}
+              refreshPill();
+              refreshList();
+              if (Announce) Announce.polite(`Restored ${entry.key}`);
+            },
+          });
+        }
+        Toast.show({
+          message: `Deleted ${entry.key}`,
+          durationMs: 30_000,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              if (globalThis.GitCiteUndo) globalThis.GitCiteUndo.runById(id);
+            },
+          },
+        });
       },
     };
   }

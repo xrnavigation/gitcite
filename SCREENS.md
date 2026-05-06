@@ -20,6 +20,19 @@ plan, see `C:\Users\brandon\.claude\plans\using-the-accessibility-agent-groovy-l
 | 3 | Only `.bib` was accepted on import; `.bibtex` was rejected by the file picker. | `src/views/landing.js` now accepts `.bib,.bibtex,text/plain,text/x-bibtex,application/x-bibtex`, the button reads **Import .bib / .bibtex**, and the drop-zone aria-label and visible text mention `.bibtex`. The parser already accepts the same syntax — only the file-picker filter was the gate. |
 | 4 | No `npm start` to launch the app locally. | Added `"start": "npm run build && npx --yes serve dist -l 8080 --no-clipboard"` and `"serve": "npx --yes serve dist -l 8080 --no-clipboard"` in `package.json`. See **How to run locally** below. |
 
+### Phase 13 follow-up edits (after the second review)
+
+| # | Issue | Resolution |
+|---|---|---|
+| P13-1 | The "Add by DOI" modal only validated a DOI string. | Replaced with **multi-mode search modal** (`src/views/add-search.js`): DOI / Title / Author / Keyword. DOI mode runs a direct CrossRef lookup; the others go through the existing keyword-search providers. Result list uses the result-card invariant. |
+| P13-2 | The library-list rendering was not table-shaped and did not expose grid semantics. | Replaced the virtual list with an **accessible role="grid"** view (`src/views/grid.js`) modeled on the WhatSock Dynamic Grid pattern. Roving tabindex, Excel/Sheets keys (arrow / Home / End / Ctrl+Home / Ctrl+End / PageUp / PageDown / F2 / Enter / type-ahead), sortable columns, `aria-rowindex` against the full filtered count. |
+| P13-3 | Pressing Enter on a citation should open an action dialog, with Edit/Duplicate swapping the dialog body to the edit form. | New **row-action dialog** (`src/views/row-action-dialog.js`) with menu / edit / duplicate / delete-confirm modes inside the same `<dialog>`. Cancel from edit/duplicate returns to menu mode. |
+| P13-4 | Delete required typed-confirmation. Now a simple confirm. | `src/views/detail.js → promptDelete` replaced with a `<dialog role="alertdialog">` Cancel/Delete pair. After delete, a 30 s **Undo toast** + activity-panel mirror restores the entry via `src/core/undo.js`. WCAG 3.3.4 / 3.3.6 stay "met" because reversibility lives in undo plus the .bib download fallback. |
+| P13-5 | No visible **Save changes** button. | Always-present `<button data-save-button>Save changes</button>` in the header (`src/views/save-button.js`). Disabled when 0 pending changes; enabled and focusable otherwise. Click and global Ctrl/Cmd+S route to the save flow. |
+| P13-6 | Escape inside an expanded disclosure did not close it. | New **disclosure helper** (`src/a11y/disclosure.js`). Escape inside an open disclosure closes it and returns focus to the disclosure button (Escape on the button itself is a no-op). Polite "{label} collapsed" announcement. Detail and edit-form disclosures route through this helper. |
+| P13-7 | No authentication affordance on startup. | Always-present **Sign in to GitHub** button in the header (`src/views/auth-toggle.js`). Two states: unauthenticated (opens auth modal) / authenticated (account menu via `aria-haspopup="menu"`). Lazy-auth contract preserved. |
+| P13-8 | Several screens were orphaned (no visible entry-point). | New **header toolbar** (`src/views/header-toolbar.js`) with `role="toolbar"` arrow-key navigation. Buttons: Library / Add citation / Search providers / Find /  Replace / Insights / Stats / Shortcuts / About / Reload library. Every screen in this document is now reachable from a click chain that starts at a visible affordance — see the **Reachable from** lines below. |
+
 ### How to run locally
 
 After `npm install`, three options:
@@ -65,10 +78,26 @@ appear on every screen.
 ### Header
 
 - `<h1>GitCite</h1>` — the only H1 on every view (WCAG 2.4.6, 2.4.10).
+- **Header toolbar** (`data-toolbar-host`, `src/views/header-toolbar.js`)
+  — `role="toolbar" aria-label="Library actions"` with arrow-key
+  navigation (single tabstop, ←/→ between buttons, Home/End to ends).
+  Buttons: **Library** · **Add citation** · **Search providers** ·
+  **Find / Replace** · **Insights** · **Stats** · **Shortcuts** ·
+  **About** · **Reload library**. This toolbar is the discoverable
+  entry-point for every previously-orphaned modal.
 - **Unsaved-changes pill** (`data-pill-host`, `src/views/pill.js`) — a
   real `<button aria-label="N unsaved changes — review">` that expands a
   panel listing each pending entry with per-row Discard. Hidden when N
   is 0. Count change announces politely at most once per 500 ms.
+- **Save changes** button (`data-save-host`, `src/views/save-button.js`)
+  — always present. Disabled when 0 pending changes; enabled and
+  focusable otherwise. Click and global Ctrl/Cmd+S route to the save
+  flow. Reachable from every screen.
+- **Auth toggle** (`data-auth-toggle-host`, `src/views/auth-toggle.js`)
+  — always present. Two states: **Sign in to GitHub** (opens auth
+  modal) and **Signed in as @{login}** (`aria-haspopup="menu"` opens
+  account menu). Lazy-auth contract preserved — read-only users not
+  forced through auth.
 - **Theme toggle** (`data-theme-toggle-slot`, `src/a11y/theme.js`) —
   three-state radio group: Light, Dark, System. Persists to
   `localStorage` and is applied before first paint to avoid flash.
@@ -182,10 +211,14 @@ because the four affordances are already present.
 
 ---
 
-## 5. Library list view
+## 5. Library list view *(now an accessible role="grid")*
 
-**File:** `src/app.js → renderLibraryView`. **Layout:** sidebar (filters)
-+ search bar (top of main) + virtual list (rest of main) + detail aside.
+**File:** `src/app.js → renderLibraryView`, `src/views/grid.js`.
+**Layout:** sidebar (filters) + search bar (top of main) + accessible
+data grid (rest of main) + detail aside. As of Phase 13 Edit 2 the
+virtual list is replaced by a true ARIA grid modeled on the WhatSock
+Dynamic Grid pattern. **Reachable from:** App boot when a library is
+loaded; **Library** button on the header toolbar.
 
 ### 5.1 Search bar
 
@@ -194,14 +227,27 @@ focused by `Ctrl/Cmd+F`. 80 ms debounce. Result-count change announces
 through the shared polite region (one region across all filters and
 search — never per-feature).
 
-### 5.2 Virtual list (HOTSPOT H1)
+### 5.2 Accessible role=grid view (HOTSPOT H1)
 
-`src/views/list.js`. `role="list"` with `aria-rowcount` set to the
-**full filtered count, not the rendered window**. Each row has
-`aria-posinset` / `aria-setsize` against the same full count. Row
-accessible name combines title + author(s) + year + entry-type label
-(text, never colour-only). Arrow keys move focus across the entire
-list; the viewport scrolls when focus reaches the edge.
+`src/views/grid.js`. `role="grid" aria-rowcount aria-colcount
+aria-readonly="true"`. Roving tabindex (only one cell is tabbable at a
+time). Six columns: **Title**, **Authors**, **Year**, **Type**,
+**Datasource**, **Saved**. Sortable column headers cycle aria-sort
+none → ascending → descending → none. `aria-rowindex` on every
+rendered row reflects the **full filtered count**, not the rendered
+window (HOTSPOT H1 invariant carries forward).
+
+Keyboard model (Excel/Google-Sheets-equivalent):
+
+| Keys | Action |
+|---|---|
+| ←/→/↑/↓ | Move focus one cell. |
+| Home / End | First / last cell of the current row. |
+| Ctrl+Home / Ctrl+End | First cell of the header row / last data cell. |
+| Page Up / Page Down | Move focus one viewport. |
+| Enter / F2 | Activate the row — opens the row-action dialog (#A). On a column header, cycles sort. |
+| Letter keys | Type-ahead jumps to the first row whose title starts with that letter. |
+| Tab | Leave the grid (single tabstop). |
 
 ### 5.3 Sidebar filters
 
@@ -309,15 +355,28 @@ button.
 
 ---
 
-## 11. Quick Add by DOI modal
+## 11. Multi-mode search modal *(replaces "Quick Add by DOI")*
 
-**File:** `src/views/quick-add.js`. **Modal:** native `<dialog>`.
-**Trigger:** `Ctrl/Cmd+D` or the **Quick Add by DOI** button on the
-Empty library screen.
+**File:** `src/views/add-search.js`. **Modal:** native `<dialog>`.
+**Reachable from:** **Add citation** button on the header toolbar;
+**Search and add** button on the empty-library screen; `Ctrl/Cmd+D`.
 
-DOI input receives initial focus. Errors associate to the input via
-`aria-describedby`. Escape closes; closing returns focus to the
-trigger.
+`<fieldset>` / `<legend>` "Search by" with four radios: **DOI**,
+**Title**, **Author**, **Keyword** (default DOI). The single
+`<input type="search">` is labelled to match the active mode. The
+provider `<select>` (Semantic Scholar / OpenAlex / CrossRef) reveals
+when the mode is anything other than DOI. **Look up DOI** /
+**Search** submits — DOI mode runs `providers.byDoi(doi)` (direct
+CrossRef `works/{doi}` lookup); the others go through the existing
+keyword-search providers.
+
+Result list below the form uses the result-card invariant
+(heading-link + Select). Clicking **Select** fires `onPick` with the
+chosen result and closes the dialog.
+
+Errors (malformed DOI, network failure) appear in `role="alert"`
+below the form. Polite "Searching…" / "{n} of {total} results"
+announcements via the shared region.
 
 ---
 
@@ -545,6 +604,118 @@ non-actionable messages; toasts with action links persist until the
 user dismisses or the action is taken. Every toast with an action link
 is **also** written to the activity panel so the link is reachable
 after the toast fades (HOTSPOT H10, WCAG 2.2.1).
+
+---
+
+## A. Row-action dialog *(new in Phase 13 Edit 3)*
+
+**File:** `src/views/row-action-dialog.js`. **Modal:** native `<dialog>`.
+**Reachable from:** Press **Enter** or **F2** on a focused grid cell,
+or click any grid row (#5).
+
+Four modes inside the same `<dialog>`. The dialog only fully closes
+on **Open detail**, **Close**, **Save** in the morph, or confirmed
+**Delete entry**.
+
+- **Menu mode** *(default)* — heading shows the entry title. Buttons:
+  **Open detail** *(default focus, closes the dialog and routes to
+  the detail aside)*, **Edit**, **Duplicate**, **Delete**, **Close**.
+- **Edit mode** *(swap-in-place)* — dialog body's contents are
+  replaced with an inline edit form pre-filled with the entry's
+  fields; `aria-labelledby` retargets to the new "Edit {key}"
+  heading; focus moves to the citation-key field. **Cancel** returns
+  to **menu mode** with focus restored to **Edit**. **Save** commits
+  and closes the dialog.
+- **Duplicate mode** — same morph but seeded with a collision-suffixed
+  key. **Cancel** returns to menu mode with focus on **Duplicate**.
+- **Delete-confirm mode** — sub-step shown when **Delete** is clicked
+  in menu mode. Cancel/Delete pair (Cancel default-focused). Confirm
+  closes the dialog and emits the simple-confirm + Undo toast (#B).
+
+## B. Delete-confirm + Undo toast *(new in Phase 13 Edit 4)*
+
+**Files:** `src/views/detail.js → promptDelete`, `src/core/undo.js`,
+`src/a11y/toast.js`. **Reachable from:** **Delete** button in the
+detail aside (#5.4) or in the row-action dialog (#A).
+
+A simple `<dialog role="alertdialog">` with **Cancel** *(default
+focus)* and **Delete** buttons. After confirmation, the entry is
+removed and a toast appears in the polite region with:
+
+- Text: "Deleted {key}".
+- Action: a real `<button data-toast-action>Undo</button>`.
+- Duration: ≥ 30 s (overrides the 6 s default).
+- **Activity-panel mirror**: same line written to `data-activity-panel`
+  with the Undo button — the action survives toast fade
+  (HOTSPOT H10, WCAG 2.2.1).
+
+Clicking **Undo** calls `GitCiteUndo.runById(...)`, which restores the
+entry via `model.mutate(entry, 'add')`, polite-announces "Restored
+{key}", and refreshes the grid. The .bib download fallback at save
+time (Phase 10) provides a second layer of reversibility — together,
+WCAG 3.3.4 / 3.3.6 stay "met" even though the typed-confirmation step
+is gone.
+
+## C. Disclosure helper *(new in Phase 13 Edit 6)*
+
+**File:** `src/a11y/disclosure.js`. **Used by:** detail aside (#5.4),
+edit-form sections (#7), JEL/LCC chips (#9), insights tabs (#13),
+keyword-search filter pane (#12), and any future
+`<button aria-expanded>` + revealed-region pair.
+
+Shared API (`GitCiteDisclosure.create({ label, content })` /
+`GitCiteDisclosure.attach({ button, region, label })`). When the
+disclosure is **expanded** and focus is **inside the revealed body**,
+Escape:
+
+1. Sets `aria-expanded="false"` and hides the body.
+2. Returns focus to the disclosure button.
+3. Polite-announces "{disclosure label} collapsed."
+
+Escape on the disclosure button itself or while collapsed is a no-op
+so outer dialogs are not hijacked.
+
+---
+
+## Reachability matrix — every screen has a visible entry-point
+
+After Phase 13 Edit 8, no screen in this document is reachable only via
+keyboard shortcut, JS API, or URL. The header toolbar makes every modal
+discoverable.
+
+| # | Screen | Reachable from |
+|---|---|---|
+| 1 | Landing screen | App boot when no library is loaded; **Reload library** button on the header toolbar; **Import library** button on the empty-library screen. |
+| 2 | Empty library screen | Click **Start with empty library** on the landing screen; **Library** on the header toolbar when the model is empty. |
+| 3 | CSV mapping dialog | Click **Import .csv** or drop a `.csv` file on the landing screen. |
+| 4 | Auto-load failure / network error landing | Same surface as #1; auto-load failure path. |
+| 5 | Library list view (accessible role="grid") | App boot when a library is loaded; **Library** on the header toolbar; close of any modal returns here. |
+| 6 | Result card | Rendered inside #11 (multi-mode search), #12 (keyword search), and #10 (lookup tab). Not directly invocable. |
+| 7 | Edit form | **Edit** button in the row-action dialog (#A); **Edit** button in the detail aside (#5.4). The form mounts in-place inside the dialog or in `<main>` depending on entry-point. |
+| 8 | Custom-field rows | Inside the edit form (#7). |
+| 9 | JEL / LCC chips | Inside the edit form (#7). |
+| 10 | Identifier lookup tab | Inside the edit form (#7). |
+| 11 | Multi-mode search modal *(formerly Quick Add)* | **Add citation** on the header toolbar; **Search and add** on the empty-library screen; `Ctrl/Cmd+D`. |
+| 12 | Keyword search modal | **Search providers** on the header toolbar; `Ctrl/Cmd+K`. (Also accessible as Tab 2 of the edit-form lookup, when present.) |
+| 13 | Insights modal | **Insights** on the header toolbar. |
+| 14 | Stats modal | **Stats** on the header toolbar. |
+| 15 | Find / Replace modal | **Find / Replace** on the header toolbar; `Ctrl/Cmd+H`. |
+| 16 | Shortcuts modal | **Shortcuts** on the header toolbar; `?` (after a modifier per WCAG 2.1.4). |
+| 17 | About / Privacy dialog | **About** on the header toolbar. |
+| 18 | Auth modal | **Sign in to GitHub** in the header (auth toggle); also opened lazily by the save flow when no token is configured. |
+| 19 | OAuth device flow modal | **Sign in with GitHub (OAuth)** tile inside the auth modal (#18). |
+| 20 | PAT setup modal | **Use a Personal Access Token** tile inside the auth modal (#18). |
+| 21 | Localhost git bridge tile / status panel | **Use local git bridge** tile inside the auth modal (#18) when the probe succeeds. |
+| 22 | Sign-out / switch-method menu | Click the auth toggle while authenticated. |
+| 23 | Save flow (success path) | **Save changes** in the header; `Ctrl/Cmd+S`. |
+| 24 | Conflict dialog | Auto-opens during the save flow when remote SHA mismatch is detected. |
+| 25 | PR fallback toast / activity entry | Auto-shown by save flow on 422 / 403 / localhost-rejected push. |
+| 26 | Auto-pull dialog | Auto-shown on app boot when the remote has changed (per `auto-pull` preference). |
+| 27 | Theme toggle | Always present in the header. |
+| 28 | Toast region + activity panel | Mounted at boot. The activity panel toggle reveals history. |
+| A  | Row-action dialog *(new in Phase 13 Edit 3)* | Press **Enter** or **F2** on a focused grid cell, or click a row in the library grid (#5). |
+| B  | Delete-confirm + Undo toast *(new in Phase 13 Edit 4)* | **Delete** in the row-action dialog (#A) or in the detail aside (#5.4). |
+| C  | Disclosure helper *(new in Phase 13 Edit 6)* | Wraps the Raw BibTeX, Chicago, edit-form, and JEL/LCC disclosures across the app — Escape inside an expanded body collapses and returns focus to the disclosure button. |
 
 ---
 

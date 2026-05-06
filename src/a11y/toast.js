@@ -73,7 +73,7 @@
     li.appendChild(time);
     li.appendChild(document.createTextNode(' — '));
     li.appendChild(document.createTextNode(message + ' '));
-    if (action && action.href && action.label) {
+    if (action && action.label && action.href) {
       const a = document.createElement('a');
       a.href = action.href;
       a.textContent = action.label;
@@ -84,6 +84,16 @@
       sr.textContent = ' (opens in new tab)';
       a.appendChild(sr);
       li.appendChild(a);
+    } else if (action && action.label && typeof action.onClick === 'function') {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('data-activity-action', '');
+      b.textContent = action.label;
+      b.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+      b.addEventListener('click', () => {
+        try { action.onClick(); } catch (_) {}
+      });
+      li.appendChild(b);
     }
     panel.appendChild(li);
   }
@@ -106,18 +116,33 @@
     text.textContent = message;
     toast.appendChild(text);
 
-    if (action && action.href && action.label) {
+    if (action && action.label && (action.href || typeof action.onClick === 'function')) {
       toast.appendChild(document.createTextNode(' '));
-      const a = document.createElement('a');
-      a.href = action.href;
-      a.textContent = action.label;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      const sr = document.createElement('span');
-      sr.style.cssText = 'position:absolute;left:-9999px';
-      sr.textContent = ' (opens in new tab)';
-      a.appendChild(sr);
-      toast.appendChild(a);
+      if (action.href) {
+        const a = document.createElement('a');
+        a.href = action.href;
+        a.textContent = action.label;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        const sr = document.createElement('span');
+        sr.style.cssText = 'position:absolute;left:-9999px';
+        sr.textContent = ' (opens in new tab)';
+        a.appendChild(sr);
+        toast.appendChild(a);
+      } else {
+        // Button-style action — used by the delete-undo flow (Phase 13
+        // Edit 4). Calling the action removes the toast.
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('data-toast-action', '');
+        btn.textContent = action.label;
+        btn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-left:0.5rem;';
+        btn.addEventListener('click', () => {
+          try { action.onClick(); } catch (_) {}
+          toast.remove();
+        });
+        toast.appendChild(btn);
+      }
 
       const dismiss = document.createElement('button');
       dismiss.type = 'button';
@@ -128,7 +153,7 @@
       dismiss.addEventListener('click', () => toast.remove());
       toast.appendChild(dismiss);
 
-      // Mirror to the activity panel so the link survives toast fade.
+      // Mirror to the activity panel so the link / action survives fade.
       appendActivityEntry({ message, action });
     }
 

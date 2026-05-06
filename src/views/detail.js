@@ -151,43 +151,61 @@
   }
 
   function promptDelete(entry) {
+    // Phase 13 Edit 4 — simple confirm + 30 s undo toast.
+    // Replaces the typed-confirmation pattern. Reversibility lives in
+    // the undo path (and the .bib download fallback at save-time), so
+    // WCAG 3.3.4 / 3.3.6 stay "met."
     if (!globalThis.GitCiteDialog) return;
     const handle = globalThis.GitCiteDialog.open({
-      title: 'Delete entry',
+      title: `Delete ${entry.key}?`,
       role: 'alertdialog',
-      content: '<p id="delete-desc">This action cannot be undone until you save. Type the citation key to confirm.</p>',
+      content: '<p id="delete-desc">This entry will be removed from your library. You can undo this for 30 seconds, or fall back to the .bib download.</p>',
       describedById: 'delete-desc',
     });
     const body = handle.dialog.querySelector('.gitcite-dialog-body');
     const wrap = document.createElement('div');
-    const Field = globalThis.GitCiteField;
-    const id = 'delete-confirm-input';
-    if (Field) {
-      const f = Field.input({ id, label: `Type "${entry.key}" to confirm`, name: 'confirm' });
-      wrap.appendChild(f);
-    }
-    const submit = document.createElement('button');
-    submit.type = 'button';
-    submit.textContent = 'Delete entry';
-    submit.disabled = true;
-    submit.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-end:0.5rem;';
+    wrap.style.cssText = 'display:flex;gap:0.5rem;';
     const cancel = document.createElement('button');
     cancel.type = 'button';
     cancel.textContent = 'Cancel';
     cancel.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
     cancel.addEventListener('click', () => handle.close());
-    wrap.appendChild(submit);
-    wrap.appendChild(cancel);
-    body.appendChild(wrap);
-
-    const input = wrap.querySelector('input');
-    input.addEventListener('input', () => {
-      submit.disabled = input.value !== entry.key;
-    });
-    submit.addEventListener('click', () => {
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.setAttribute('data-confirm-delete', '');
+    confirm.textContent = 'Delete';
+    confirm.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    confirm.addEventListener('click', () => {
       handle.close();
-      if (typeof _opts.onDelete === 'function') _opts.onDelete(entry);
+      runDelete(entry);
     });
+    wrap.appendChild(cancel);
+    wrap.appendChild(confirm);
+    body.appendChild(wrap);
+    try { cancel.focus(); } catch (_) {}
+  }
+
+  function runDelete(entry) {
+    if (typeof _opts.onDelete === 'function') _opts.onDelete(entry);
+    const id = 'undo-' + entry.key + '-' + Date.now().toString(36);
+    if (globalThis.GitCiteUndo && typeof _opts.onRestore === 'function') {
+      globalThis.GitCiteUndo.push({
+        id,
+        undo: () => _opts.onRestore(entry),
+      });
+    }
+    if (globalThis.GitCiteToast) {
+      globalThis.GitCiteToast.show({
+        message: `Deleted ${entry.key}`,
+        durationMs: 30_000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            if (globalThis.GitCiteUndo) globalThis.GitCiteUndo.runById(id);
+          },
+        },
+      });
+    }
   }
 
   globalThis.GitCiteDetail = { mount, show, current: () => _entry };
