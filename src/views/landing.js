@@ -18,18 +18,18 @@
     heading.textContent = 'Load a library';
     host.appendChild(heading);
 
-    // Import .bib (file picker)
+    // Import .bib / .bibtex (file picker)
     const bibBtn = document.createElement('button');
     bibBtn.type = 'button';
     bibBtn.setAttribute('data-import-bib', '');
-    bibBtn.textContent = 'Import .bib';
+    bibBtn.textContent = 'Import .bib / .bibtex';
     bibBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
     const bibInput = document.createElement('input');
     bibInput.type = 'file';
-    bibInput.accept = '.bib,text/plain';
+    bibInput.accept = '.bib,.bibtex,text/plain,text/x-bibtex,application/x-bibtex';
     bibInput.style.cssText = 'position:absolute;left:-9999px;';
     bibInput.id = 'gitcite-bib-input';
-    bibInput.setAttribute('aria-label', 'Pick a .bib file');
+    bibInput.setAttribute('aria-label', 'Pick a .bib or .bibtex file');
     bibInput.setAttribute('aria-hidden', 'true');
     bibInput.tabIndex = -1;
     bibBtn.addEventListener('click', () => bibInput.click());
@@ -80,10 +80,10 @@
     // Drag-drop zone — AFTER the buttons so keyboard substitute precedes it.
     const drop = document.createElement('div');
     drop.setAttribute('data-drop-zone', '');
-    drop.setAttribute('aria-label', 'Drop a .bib or .csv file here, or use the Import buttons above');
+    drop.setAttribute('aria-label', 'Drop a .bib, .bibtex, or .csv file here, or use the Import buttons above');
     drop.tabIndex = -1; // not in tab order — keyboard substitute is the buttons
     drop.style.cssText = 'margin-top:1rem;padding:2rem;border:2px dashed var(--border);border-radius:8px;text-align:center;color:var(--fg-muted);';
-    drop.textContent = 'Drop a .bib or .csv file here';
+    drop.textContent = 'Drop a .bib, .bibtex, or .csv file here';
     drop.addEventListener('dragover', (e) => { e.preventDefault(); });
     drop.addEventListener('drop', async (e) => {
       e.preventDefault();

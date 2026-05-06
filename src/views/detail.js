@@ -88,6 +88,13 @@
   }
 
   function disclosure(label, contentEl) {
+    // Delegate to the universal disclosure helper so Escape semantics
+    // (close + restore focus to button + polite announce) are consistent
+    // across the app — DESIGN_SPEC Phase 13 Edit 6.
+    if (globalThis.GitCiteDisclosure) {
+      return globalThis.GitCiteDisclosure.create({ label, content: contentEl }).wrap;
+    }
+    // Fallback for environments where the helper has not loaded yet.
     const wrap = document.createElement('div');
     const id = (globalThis.GitCiteIds || { next: () => 'd' }).next('detail-disclosure');
     const btn = document.createElement('button');

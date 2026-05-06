@@ -26,6 +26,9 @@
     for (const key of model.dirty) items.push({ key, op: 'upsert' });
     for (const key of model.deleted) items.push({ key, op: 'delete' });
     Pill.update({ count: items.length, items });
+    if (globalThis.GitCiteSaveButton) {
+      globalThis.GitCiteSaveButton.update({ count: items.length });
+    }
   }
 
   function setupPill() {
@@ -34,18 +37,146 @@
     Pill.mount(host, {
       onDiscard: (key) => { model.discard(key); refreshPill(); },
     });
+    const saveHost = document.querySelector('[data-save-host]');
+    if (saveHost && globalThis.GitCiteSaveButton) {
+      globalThis.GitCiteSaveButton.mount(saveHost, {
+        onSave: () => triggerSave(),
+      });
+    }
+    setupAuthToggle();
     refreshPill();
+  }
+
+  function setupAuthToggle() {
+    const host = document.querySelector('[data-auth-toggle-host]');
+    if (!host || !globalThis.GitCiteAuthToggle) return;
+    globalThis.GitCiteAuthToggle.mount(host, {
+      onSignIn: () => {
+        if (globalThis.GitCiteAuthModal) globalThis.GitCiteAuthModal.open({});
+      },
+      onMenu: () => {
+        // The sign-out / switch-method menu lives in the existing auth
+        // surface; for now reuse the auth modal as the entry point.
+        if (globalThis.GitCiteAuthModal) globalThis.GitCiteAuthModal.open({});
+      },
+    });
+  }
+
+  function triggerSave() {
+    // Phase 13 Edit 5 — visible save button. Wires to the existing
+    // save flow (Phase 10) when present; otherwise surfaces a toast so
+    // the user knows the action was received and that auth/save are
+    // configured separately. Future work: route through auth modal
+    // first when no token is configured.
+    if (globalThis.GitCiteSave && typeof globalThis.GitCiteSave.run === 'function') {
+      globalThis.GitCiteSave.run();
+      return;
+    }
+    if (Toast) Toast.show({ message: 'Save flow not configured — see Sign in.' });
   }
 
   function showLanding() {
     const main = document.querySelector('#main');
     if (!main) return;
+    const nav = document.querySelector('nav');
+    const aside = document.querySelector('aside');
+    if (nav) nav.hidden = true;
+    if (aside) aside.hidden = true;
     Landing.mount(main, {
       onBib: (text) => importBibText(text),
       onCsv: (text) => importCsvText(text),
       onEmpty: () => {
-        main.innerHTML = '';
+        showEmptyLibrary();
         Toast.show({ message: 'Started with empty library' });
+      },
+    });
+  }
+
+  function showEmptyLibrary() {
+    const main = document.querySelector('#main');
+    if (!main) return;
+    main.innerHTML = '';
+
+    const region = document.createElement('section');
+    region.setAttribute('aria-labelledby', 'empty-library-heading');
+
+    const h2 = document.createElement('h2');
+    h2.id = 'empty-library-heading';
+    h2.textContent = 'Empty library';
+    region.appendChild(h2);
+
+    const p = document.createElement('p');
+    p.textContent = 'No entries yet. Add a citation manually, or load an existing library.';
+    region.appendChild(p);
+
+    const toolbar = document.createElement('div');
+    toolbar.setAttribute('role', 'group');
+    toolbar.setAttribute('aria-label', 'Empty library actions');
+    toolbar.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.5rem;margin-block-start:0.5rem;';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.setAttribute('data-empty-add', '');
+    addBtn.textContent = 'Add citation';
+    addBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    addBtn.addEventListener('click', () => openNewEntryForm());
+    toolbar.appendChild(addBtn);
+
+    const quickBtn = document.createElement('button');
+    quickBtn.type = 'button';
+    quickBtn.setAttribute('data-empty-quick-add', '');
+    quickBtn.textContent = 'Quick Add by DOI';
+    quickBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    quickBtn.addEventListener('click', () => {
+      if (globalThis.GitCiteQuickAdd) {
+        globalThis.GitCiteQuickAdd.open({
+          onFetch: async () => { throw new Error('DOI lookup not configured.'); },
+        });
+      }
+    });
+    toolbar.appendChild(quickBtn);
+
+    const loadBtn = document.createElement('button');
+    loadBtn.type = 'button';
+    loadBtn.setAttribute('data-empty-load', '');
+    loadBtn.textContent = 'Import library';
+    loadBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    loadBtn.addEventListener('click', () => showLanding());
+    toolbar.appendChild(loadBtn);
+
+    region.appendChild(toolbar);
+    main.appendChild(region);
+
+    addBtn.focus();
+    if (Announce && Announce.polite) Announce.polite('Empty library. Add a citation or import a library.');
+  }
+
+  function openNewEntryForm() {
+    const main = document.querySelector('#main');
+    if (!main || !globalThis.GitCiteEditForm) return;
+    const wrap = document.createElement('div');
+    main.innerHTML = '';
+
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.textContent = 'Back to library';
+    back.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-block-end:0.5rem;';
+    back.addEventListener('click', () => {
+      if (model.entries.length === 0) showEmptyLibrary();
+      else renderLibraryView();
+    });
+    main.appendChild(back);
+    main.appendChild(wrap);
+
+    globalThis.GitCiteEditForm.open(wrap, {
+      onSave: (entry) => {
+        model.mutate(entry, 'add');
+        refreshPill();
+        renderLibraryView();
+      },
+      onCancel: () => {
+        if (model.entries.length === 0) showEmptyLibrary();
+        else renderLibraryView();
       },
     });
   }

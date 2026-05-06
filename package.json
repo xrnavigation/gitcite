@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "bash tools/concat.sh",
+    "start": "npm run build && npx --yes serve dist -l 8080 --no-clipboard",
+    "serve": "npx --yes serve dist -l 8080 --no-clipboard",
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
     "test:e2e": "playwright test",
