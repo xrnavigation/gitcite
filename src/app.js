@@ -172,10 +172,11 @@
     const region = document.createElement('section');
     region.setAttribute('aria-labelledby', 'empty-library-heading');
 
-    const h2 = document.createElement('h2');
-    h2.id = 'empty-library-heading';
-    h2.textContent = 'Empty library';
-    region.appendChild(h2);
+    const h1 = document.createElement('h1');
+    h1.id = 'empty-library-heading';
+    h1.textContent = 'Empty library';
+    h1.setAttribute('tabindex', '-1');
+    region.appendChild(h1);
 
     const p = document.createElement('p');
     p.textContent = 'No entries yet. Add a citation manually, or load an existing library.';
@@ -300,6 +301,18 @@
     if (!main) return;
 
     main.innerHTML = '';
+
+    // Phase 14 B.2 — every view's first heading inside <main> is an H1.
+    // Visually hidden because the visible heading slot is the library
+    // grid's caption + columnheaders, but kept structurally so skip-link
+    // users land on a real H1 and grid's aria-labelledby resolves.
+    const h1 = document.createElement('h1');
+    h1.id = 'library-heading';
+    h1.textContent = 'Library';
+    h1.setAttribute('tabindex', '-1');
+    h1.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;';
+    main.appendChild(h1);
+
     const layout = document.createElement('div');
     layout.style.cssText = 'display:grid;grid-template-rows:auto 1fr;gap:0.5rem;height:80vh;';
 
@@ -460,9 +473,28 @@
 
   async function start() {
     setupPill();
+    setupSkipLink();
     try { await Persistence.open(); } catch (_) {}
     const loaded = await autoLoad();
     if (!loaded) showLanding();
+  }
+
+  // Phase 14 B.3 — when the user activates the skip link, move focus to
+  // the H1 of the current view (which carries tabindex=-1) so screen
+  // readers immediately announce "heading level 1, …" instead of just
+  // landing on the empty <main>.
+  function setupSkipLink() {
+    const skip = document.querySelector('.skip-link');
+    if (!skip) return;
+    skip.addEventListener('click', (e) => {
+      const main = document.querySelector('#main');
+      if (!main) return;
+      const h1 = main.querySelector('h1');
+      if (h1) {
+        e.preventDefault();
+        try { h1.focus(); } catch (_) {}
+      }
+    });
   }
 
   if (document.readyState === 'loading') {

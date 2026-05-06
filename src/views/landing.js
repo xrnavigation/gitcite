@@ -14,8 +14,9 @@
     host.setAttribute('aria-label', 'Library import');
     host.setAttribute('role', 'region');
 
-    const heading = document.createElement('h2');
+    const heading = document.createElement('h1');
     heading.textContent = 'Load a library';
+    heading.setAttribute('tabindex', '-1');
     host.appendChild(heading);
 
     // Import .bib / .bibtex (file picker)
