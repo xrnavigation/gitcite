@@ -46,7 +46,9 @@
 
   if (globalThis.GitCiteGrid) return;
 
-  const COLUMNS = [
+  // Phase 17 #8 — column registry. Settings can reorder + show/hide
+  // these by mutating the live COLUMNS array via applyColumnPrefs().
+  const ALL_COLUMNS = [
     { key: 'title',      label: 'Title',      get: (e) => (e.fields || {}).title || '(untitled)' },
     { key: 'authors',    label: 'Authors',    get: (e) => (e.fields || {}).author || '' },
     { key: 'year',       label: 'Year',       get: (e) => String((e.fields || {}).year || (e.fields || {}).date_range || '') },
@@ -54,6 +56,7 @@
     { key: 'datasource', label: 'Datasource', get: (e) => (e.fields || {}).datasource || (e.datasource || '—') },
     { key: 'saved',      label: 'Saved',      get: (e) => (e._dirty ? 'Local-only' : 'Synced') },
   ];
+  let COLUMNS = ALL_COLUMNS.slice();
   const ROW_HEIGHT = 56;
   const HEADER_ROW = -1;
   // Phase 15 #2 / Phase 16 #12 — Render-all threshold. Below this,
@@ -555,5 +558,34 @@
     return row;
   }
 
-  globalThis.GitCiteGrid = { mount, update, focusCell, getFocused };
+  // Phase 17 #8 — applyPrefs: settings dialog calls this after the user
+  // toggles visibility / reorder. Rebuilds COLUMNS from the persisted
+  // ordering, drops the table, and re-mounts so the headers + every
+  // row reflect the new column set. Sort state is preserved when the
+  // sorted column is still visible.
+  function applyPrefs(prefs) {
+    if (!Array.isArray(prefs) || prefs.length === 0) {
+      COLUMNS = ALL_COLUMNS.slice();
+    } else {
+      const visible = prefs.filter((p) => p.visible);
+      const ordered = [];
+      for (const p of visible) {
+        const def = ALL_COLUMNS.find((c) => c.key === p.key);
+        if (def) ordered.push(def);
+      }
+      // Always keep at least one column so the grid has something to render.
+      COLUMNS = ordered.length ? ordered : [ALL_COLUMNS[0]];
+    }
+    if (_sortCol != null && _sortCol >= COLUMNS.length) {
+      _sortCol = null;
+      _sortDir = null;
+    }
+    if (_focusCol >= COLUMNS.length) _focusCol = COLUMNS.length - 1;
+    if (_host) {
+      mount(_host, _opts);
+      update(_entries);
+    }
+  }
+
+  globalThis.GitCiteGrid = { mount, update, focusCell, getFocused, applyPrefs };
 })();

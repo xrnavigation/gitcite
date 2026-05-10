@@ -629,8 +629,26 @@
       });
     }
 
+    // Phase 17 #8 — apply persisted column prefs after the grid has
+    // mounted (otherwise applyPrefs would no-op). The grid resets
+    // its column array to ALL_COLUMNS on each mount(), so we re-apply
+    // every time renderLibraryView runs.
+    applyColumnPrefs();
+
     refreshList();
   }
+
+  // Phase 17 #8 — apply persisted column prefs to the grid. Called by
+  // settings.js whenever the user reorders / toggles columns AND from
+  // renderLibraryView so a returning user sees their saved layout
+  // immediately.
+  function applyColumnPrefs() {
+    if (globalThis.GitCiteSettings && globalThis.GitCiteGrid && globalThis.GitCiteGrid.applyPrefs) {
+      const prefs = globalThis.GitCiteSettings.getColumns();
+      globalThis.GitCiteGrid.applyPrefs(prefs);
+    }
+  }
+  // Exposed below on GitCiteApp so settings.js can call back into us.
 
   function rowActionHandlers() {
     return {
@@ -994,6 +1012,7 @@
     start();
   }
 
-  // Expose helpers for E2E tests.
+  // Expose helpers for E2E tests + the settings-callback hook.
   globalThis.GitCiteApp.import = { bibText: importBibText, csvText: importCsvText };
+  globalThis.GitCiteApp.applyColumnPrefs = applyColumnPrefs;
 })();
