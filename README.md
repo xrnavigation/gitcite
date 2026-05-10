@@ -43,16 +43,20 @@ after the first visit thanks to browser caching.
 
 ### 2. Download once, run offline
 
-For full offline use, grab a single self-contained HTML file:
+For full offline use, grab the single self-contained HTML file from the
+latest release:
 
-- **From the repo:** download
-  https://raw.githubusercontent.com/xrnavigation/gitcite/main/dist/index.html
-  and save as `gitcite.html` (or any name). Double-click to open. No
-  installation, no network required after download.
-- **From a release:** if a tagged release exists at
-  https://github.com/xrnavigation/gitcite/releases, download the
-  `gitcite.html` asset attached to it. Releases are pinned to a known
-  `dist/index.html` build.
+**[Download gitcite.html (v1.0.0)](https://github.com/xrnavigation/gitcite/releases/download/v1.0.0/gitcite.html)**
+
+Save it anywhere (Desktop, Downloads, a USB stick) and double-click to
+open. No installation, no build, no network required after download. The
+file *is* the application.
+
+All releases live at
+https://github.com/xrnavigation/gitcite/releases — each one pins a known
+`dist/index.html` build. If you'd rather follow the bleeding edge, the
+raw file from `main` is at
+https://raw.githubusercontent.com/xrnavigation/gitcite/main/dist/index.html.
 
 `file://` features that work: local library, prefs, dirty pill, search
 against CrossRef / OpenAlex / Semantic Scholar, GitHub PAT and OAuth
