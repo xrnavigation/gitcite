@@ -27,6 +27,42 @@
     { value: 'keyword', label: 'Keyword', inputLabel: 'Keyword query', placeholder: 'urban planning' },
   ];
 
+  // Phase 17 follow-up — per-provider capability map. The search UI
+  // restricts page-size choices and pagination to what each provider
+  // can actually deliver, so the user is never offered a setting that
+  // produces an HTTP 400 / 404 / silent truncation.
+  //
+  //   semanticscholar  /paper/search caps unauthenticated traffic at
+  //                    100 results total (offset+limit ≤ 100). limit
+  //                    max 100, page sizes ≤ 100. Without these caps
+  //                    the user can pick "500 per page" or page beyond
+  //                    100 and hit a hard 400 Bad Request.
+  //   openalex         per_page max 200; cursor-style pagination beyond
+  //                    10000 (we use page-based, capped at 10000).
+  //   crossref         rows max 1000; deep pagination with offset.
+  //
+  // Adjust here when adding a provider; the UI follows automatically.
+  const PROVIDER_CAPS = {
+    semanticscholar: {
+      pageSizes: [10, 25, 50, 100],
+      maxResults: 100,
+      note: 'Semantic Scholar caps unauthenticated paper search at 100 results total. Switch to OpenAlex or CrossRef for deeper pagination.',
+    },
+    openalex: {
+      pageSizes: [10, 25, 50, 100, 200],
+      maxResults: 10000,
+      note: '',
+    },
+    crossref: {
+      pageSizes: [10, 25, 50, 100, 500, 1000],
+      maxResults: 10000,
+      note: '',
+    },
+  };
+  function getCaps(provider) {
+    return PROVIDER_CAPS[provider] || PROVIDER_CAPS.semanticscholar;
+  }
+
   function open(opts) {
     opts = opts || {};
     const Dialog = globalThis.GitCiteDialog;
@@ -118,7 +154,9 @@
     provBlock.appendChild(provSelect);
     providerWrap.appendChild(provBlock);
 
-    // Phase 15 #7 — page size combobox.
+    // Phase 15 #7 — page size combobox. Phase 17 follow-up: options are
+    // populated from PROVIDER_CAPS[provider].pageSizes by syncProviderCaps()
+    // so the user can never pick a setting the provider rejects.
     const sizeBlock = document.createElement('div');
     const sizeLabel = document.createElement('label');
     const sizeId = 'add-search-page-size';
@@ -129,16 +167,19 @@
     const sizeSelect = document.createElement('select');
     sizeSelect.id = sizeId;
     sizeSelect.setAttribute('data-search-page-size', '');
-    for (const n of [10, 25, 50, 100, 500]) {
-      const o = document.createElement('option');
-      o.value = String(n); o.textContent = String(n);
-      sizeSelect.appendChild(o);
-    }
-    sizeSelect.value = '10';
     sizeBlock.appendChild(sizeSelect);
     providerWrap.appendChild(sizeBlock);
 
     form.appendChild(providerWrap);
+
+    // Phase 17 follow-up — provider capability note. Visible whenever
+    // the active provider has a non-empty caveat (Semantic Scholar's
+    // 100-result cap, etc.). Lives outside the form's role="alert"
+    // region because it is informational, not an error.
+    const capNote = document.createElement('p');
+    capNote.setAttribute('data-provider-cap-note', '');
+    capNote.style.cssText = 'margin:0.25rem 0;color:var(--fg-muted);font-size:0.875rem;';
+    form.appendChild(capNote);
 
     // Submit + Cancel ---------------------------------------------------
     const actions = document.createElement('div');
@@ -272,7 +313,32 @@
     provSelect.addEventListener('change', () => {
       // Reset offset; user must press Search to apply.
       ctx.offset = 0;
+      // Phase 17 follow-up — repopulate page-size options for the newly
+      // selected provider (filter the choice list down to what that
+      // provider can actually return) and surface its capability note.
+      // Pure UI / DOM update — no network call, so still WCAG 3.2.2 OK.
+      syncProviderCaps();
     });
+
+    function syncProviderCaps() {
+      const caps = getCaps(provSelect.value);
+      // Preserve the user's prior choice when it's still valid; otherwise
+      // pick the largest option the new provider supports (best UX:
+      // someone who liked "100 per page" on CrossRef switching to
+      // Semantic Scholar gets 100 not 10).
+      const prev = parseInt(sizeSelect.value, 10) || 10;
+      sizeSelect.innerHTML = '';
+      for (const n of caps.pageSizes) {
+        const o = document.createElement('option');
+        o.value = String(n); o.textContent = String(n);
+        sizeSelect.appendChild(o);
+      }
+      const fallback = caps.pageSizes[caps.pageSizes.length - 1];
+      sizeSelect.value = String(caps.pageSizes.includes(prev) ? prev : fallback);
+      capNote.textContent = caps.note || '';
+    }
+    // Initial population for the default provider.
+    syncProviderCaps();
 
     // Mode change handler -----------------------------------------------
     function onModeChange() {
@@ -328,14 +394,25 @@
       error.textContent = 'Search providers not loaded.';
       return;
     }
-    const limit = sizeSelect ? (parseInt(sizeSelect.value, 10) || 10) : 10;
-    const offset = runOpts.keepOffset ? ctx.offset : 0;
-    ctx.offset = offset;
+    let limit = sizeSelect ? (parseInt(sizeSelect.value, 10) || 10) : 10;
+    let offset = runOpts.keepOffset ? ctx.offset : 0;
     // Phase 16 #3 — pagination passes the pinned provider so an earlier
     // OpenAlex fallback (or any provider switch) doesn't silently change
     // providers when stepping through pages. New searches read the live
     // <select>.
     const provider = runOpts.provider || provSelect.value;
+    // Phase 17 follow-up — defensive clamp. The UI already restricts the
+    // page-size select to per-provider capabilities, but a stale ctx.offset
+    // (from a prior provider with deeper pagination) plus a fresh smaller
+    // provider could still build a request the provider cannot serve.
+    // Cap both at the provider's published reachability.
+    const caps = getCaps(provider);
+    const maxPageSize = caps.pageSizes[caps.pageSizes.length - 1];
+    if (limit > maxPageSize) limit = maxPageSize;
+    if (offset + limit > caps.maxResults) {
+      offset = Math.max(0, caps.maxResults - limit);
+    }
+    ctx.offset = offset;
     // Phase 13 a11y review (M4): the status node is role=status, so
     // updating its text content is the announcement — do not also call
     // GitCiteAnnounce.polite (avoids double-announce).
@@ -398,18 +475,32 @@
   }
 
   function updatePager(ctx, out, limit, offset) {
-    const total = out.total || out.results.length;
+    // Phase 17 follow-up — clamp the reachable total to the provider's
+    // hard cap so the pager never invites the user to step into a
+    // window that will 400. For Semantic Scholar that means stopping
+    // at offset+limit ≤ 100; we display the upstream "of T" so the user
+    // still sees how many matches existed, but disable Next earlier.
+    const caps = getCaps(ctx.activeProvider || ctx.provSelect.value);
+    const maxReachable = caps.maxResults;
+    const upstreamTotal = out.total || out.results.length;
+    const total = upstreamTotal;
     const start = total === 0 ? 0 : offset + 1;
     const end = Math.min(total, offset + out.results.length);
     // Phase 15 #8 — status text appears both at the top (status node)
     // and on the pager (data-search-page-status) so the announcement is
     // unambiguous and the pager has a visible text label.
+    const reachableSuffix = (upstreamTotal > maxReachable)
+      ? ` (provider returns at most ${maxReachable})`
+      : '';
     ctx.status.textContent = total > out.results.length
-      ? `Showing ${start}–${end} of ${total} results`
-      : `${out.results.length} of ${total} results`;
-    ctx.pageStatus.textContent = `Page ${Math.floor(offset / limit) + 1} of ${Math.max(1, Math.ceil(total / limit))}`;
+      ? `Showing ${start}–${end} of ${total} results${reachableSuffix}`
+      : `${out.results.length} of ${total} results${reachableSuffix}`;
+    const pageCount = Math.max(1, Math.ceil(Math.min(total, maxReachable) / limit));
+    ctx.pageStatus.textContent = `Page ${Math.floor(offset / limit) + 1} of ${pageCount}`;
     ctx.prevBtn.disabled = offset <= 0;
-    ctx.nextBtn.disabled = end >= total;
+    // Disable Next when we've returned everything OR the next page would
+    // exceed the provider's reachable cap.
+    ctx.nextBtn.disabled = end >= total || (offset + limit) >= maxReachable;
     // Show pager only if there is at least one page of overflow OR results exist.
     ctx.pager.style.display = total > 0 ? 'flex' : 'none';
   }

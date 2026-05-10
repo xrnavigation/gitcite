@@ -190,12 +190,15 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     expect(ss.value).toBe('semanticscholar');
   });
 
-  it('Phase 15 #7 — exposes a "Results per page" combobox with 10/25/50/100/500', () => {
+  it('Phase 15 #7 / Phase 17 follow-up — exposes a "Results per page" combobox; default Semantic Scholar tops out at 100', () => {
     AddSearch.open({});
     const sel = document.querySelector('dialog [data-search-page-size]');
     expect(sel).toBeTruthy();
     const values = Array.from(sel.querySelectorAll('option')).map((o) => o.value);
-    expect(values).toEqual(['10', '25', '50', '100', '500']);
+    // Default provider is semanticscholar — its cap is 100 results total,
+    // so 500 is intentionally not offered. CrossRef gets 500 + 1000 (covered
+    // by the Phase 17 follow-up test below).
+    expect(values).toEqual(['10', '25', '50', '100']);
     expect(sel.value).toBe('10');
   });
 
@@ -400,5 +403,89 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     const lastCall = search.mock.calls.at(-1)[0];
     expect(lastCall.provider).toBe('crossref');
     expect(lastCall.offset).toBe(0);
+  });
+
+  it('Phase 17 follow-up — Semantic Scholar restricts page-size options to ≤ 100 (no 500)', () => {
+    AddSearch.open({});
+    const provSel = document.querySelector('dialog [data-search-provider]');
+    provSel.value = 'semanticscholar';
+    provSel.dispatchEvent(new Event('change', { bubbles: true }));
+    const sizeOpts = Array.from(document.querySelectorAll('dialog [data-search-page-size] option')).map((o) => o.value);
+    expect(sizeOpts).toEqual(['10', '25', '50', '100']);
+    expect(sizeOpts).not.toContain('500');
+    const note = document.querySelector('dialog [data-provider-cap-note]');
+    expect(note.textContent).toMatch(/100 results/);
+  });
+
+  it('Phase 17 follow-up — switching to CrossRef restores the larger page-size options', () => {
+    AddSearch.open({});
+    const provSel = document.querySelector('dialog [data-search-provider]');
+    provSel.value = 'crossref';
+    provSel.dispatchEvent(new Event('change', { bubbles: true }));
+    const sizeOpts = Array.from(document.querySelectorAll('dialog [data-search-page-size] option')).map((o) => o.value);
+    expect(sizeOpts).toContain('500');
+    expect(sizeOpts).toContain('1000');
+    const note = document.querySelector('dialog [data-provider-cap-note]');
+    expect(note.textContent).toBe('');
+  });
+
+  it('Phase 17 follow-up — Semantic Scholar Next is disabled when offset+limit reaches 100', async () => {
+    const search = vi.fn(async (opts) => ({
+      results: Array.from({ length: opts.limit }, (_, i) => ({ title: `r-${opts.offset + i}`, authors: 'A', year: '2024', doi: '', url: 'https://x' })),
+      total: 1000, // upstream claims 1000 but provider can only deliver 100
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    // Default provider is semanticscholar; pick limit=50.
+    const sizeSel = document.querySelector('dialog [data-search-page-size]');
+    sizeSel.value = '50';
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 5));
+    // Page 1 (offset=0,limit=50): Next allowed.
+    let next = document.querySelector('dialog [data-search-next]');
+    expect(next.disabled).toBe(false);
+    next.click();
+    await new Promise((r) => setTimeout(r, 5));
+    // Page 2 (offset=50,limit=50): offset+limit=100; we are AT the cap.
+    // Next must be disabled — page 3 would require offset=100, which the
+    // provider rejects (offset+limit > 100).
+    next = document.querySelector('dialog [data-search-next]');
+    expect(next.disabled).toBe(true);
+  });
+
+  it('Phase 17 follow-up — defensive clamp: a stale offset is squashed when switching to a smaller-cap provider', async () => {
+    const search = vi.fn(async () => ({
+      results: [{ title: 'X', authors: 'A', year: '2024', doi: '', url: 'https://x' }],
+      total: 5000,
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    // Switch to CrossRef and step deep.
+    const provSel = document.querySelector('dialog [data-search-provider]');
+    provSel.value = 'crossref';
+    provSel.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('dialog [data-search-page-size]').value = '100';
+    document.querySelector('dialog input[data-search-input]').value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 5));
+    // Page through to offset 200.
+    document.querySelector('dialog [data-search-next]').click();
+    await new Promise((r) => setTimeout(r, 5));
+    document.querySelector('dialog [data-search-next]').click();
+    await new Promise((r) => setTimeout(r, 5));
+    // Switch back to Semantic Scholar — page-size auto-adjusts to ≤ 100,
+    // which is fine; user presses Search.
+    provSel.value = 'semanticscholar';
+    provSel.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 5));
+    const lastCall = search.mock.calls.at(-1)[0];
+    expect(lastCall.provider).toBe('semanticscholar');
+    // The fresh search resets offset to 0 (Phase 17 #7 contract).
+    expect(lastCall.offset).toBe(0);
+    // And limit is at most 100 (SS cap).
+    expect(lastCall.limit).toBeLessThanOrEqual(100);
   });
 });
