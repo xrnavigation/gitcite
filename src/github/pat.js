@@ -16,10 +16,47 @@
     const Dialog = globalThis.GitCiteDialog;
     const handle = Dialog.open({
       title: 'Sign in with a Personal Access Token',
-      content: '<p id="pat-desc">A Personal Access Token (PAT) lets GitCite act on your behalf to push library updates. Use a fine-grained PAT with Contents: Read and write on this repo only.</p>',
+      content: '<p id="pat-desc">A Personal Access Token (PAT) lets GitCite act on your behalf to push library updates. Follow the steps below to create one with the minimum permissions needed.</p>',
       describedById: 'pat-desc',
     });
     const body = handle.dialog.querySelector('.gitcite-dialog-body');
+
+    // Phase 15 #6 — explicit step-by-step setup. Tells the user exactly
+    // what scope to pick (fine-grained vs classic) and which permissions
+    // to grant so the token works for save AND can't do anything else.
+    const setup = document.createElement('section');
+    setup.setAttribute('aria-labelledby', 'pat-setup-heading');
+    setup.style.cssText = 'margin-block-end:1rem;';
+    const setupH = document.createElement('h3');
+    setupH.id = 'pat-setup-heading';
+    setupH.textContent = 'How to create the token';
+    setupH.style.cssText = 'margin:0 0 0.5rem;font-size:1rem;';
+    setup.appendChild(setupH);
+
+    const ol = document.createElement('ol');
+    ol.style.cssText = 'margin:0 0 0.5rem 1.25rem;padding:0;line-height:1.5;';
+    const steps = [
+      'Click "Generate token on GitHub" below — it opens GitHub\'s "New fine-grained personal access token" page in a new tab.',
+      'Token name: anything memorable (e.g. "GitCite — my-library").',
+      'Expiration: pick a length you are comfortable with. GitCite re-prompts when the token expires.',
+      'Repository access: choose "Only select repositories", then pick the single repo where the .bib file lives.',
+      'Repository permissions → set "Contents" to "Read and write". Leave every other permission set to "No access".',
+      'Click Generate token, copy the value (it begins with github_pat_), and paste it below.',
+    ];
+    for (const s of steps) {
+      const li = document.createElement('li');
+      li.textContent = s;
+      ol.appendChild(li);
+    }
+    setup.appendChild(ol);
+
+    const note = document.createElement('p');
+    note.style.cssText = 'margin:0;font-size:0.875rem;color:var(--fg-muted);';
+    note.innerHTML =
+      'Classic tokens also work — pick the <code>repo</code> scope (or <code>public_repo</code> for public repositories). ' +
+      'Fine-grained tokens are preferred because they limit access to a single repository.';
+    setup.appendChild(note);
+    body.appendChild(setup);
 
     // Generate-token link
     const gen = document.createElement('a');

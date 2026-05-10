@@ -1,12 +1,19 @@
-// Phase 13 Edit 1 — multi-mode add-citation modal.
-// Replaces the older Quick Add by DOI modal. The user picks a search
-// mode (DOI / Title / Author / Keyword); DOI mode runs a direct
-// CrossRef lookup via providers.byDoi, the others go through the
-// existing keyword-search providers (Semantic Scholar / OpenAlex /
-// CrossRef). Results render with the result-card invariant
+// Phase 13 Edit 1 / Phase 15 — multi-mode add-citation modal.
+// The user picks a search mode (DOI / Title / Author / Keyword); DOI
+// mode runs a direct CrossRef lookup via providers.byDoi, the others
+// go through the existing keyword-search providers (Semantic Scholar
+// / OpenAlex / CrossRef). Results render with the result-card invariant
 // (heading-link + Select only). Select fires onPick with the chosen
-// result and closes the dialog. WCAG 1.3.1, 2.4.3, 2.4.4, 3.3.1,
-// 3.3.3, 4.1.2, 4.1.3.
+// result and closes the dialog.
+//
+// Phase 15 additions:
+//   #4  After Select, the dialog routes the picked result through onPick,
+//       which opens an edit form. After the user saves the form, focus
+//       returns to the original Select button so the search list is the
+//       resumption point — no need to tab back.
+//   #7  Page size combobox (10/25/50/100/500).
+//   #8  Pagination — Prev / Next buttons, status text "showing N–M of T".
+// WCAG 1.3.1, 2.4.3, 2.4.4, 3.3.1, 3.3.3, 4.1.2, 4.1.3.
 
 (function () {
   'use strict';
@@ -85,26 +92,52 @@
     // Provider select (non-DOI modes only) ------------------------------
     const providerWrap = document.createElement('div');
     providerWrap.setAttribute('data-provider-wrap', '');
+    providerWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;';
     // Default mode is keyword → provider select visible.
     providerWrap.hidden = false;
+    const provBlock = document.createElement('div');
     const provLabel = document.createElement('label');
     provLabel.textContent = 'Provider';
     const provId = 'add-search-provider';
     provLabel.setAttribute('for', provId);
+    provBlock.appendChild(provLabel);
+    provBlock.appendChild(document.createElement('br'));
     const provSelect = document.createElement('select');
     provSelect.id = provId;
     provSelect.setAttribute('data-search-provider', '');
-    // Phase 14 C.4 — OpenAlex is the default. Semantic Scholar's
-    // unauthenticated endpoint rate-limits to ~1 req/sec and is unreliable
-    // as a default; users can still pick it explicitly.
-    for (const [v, l] of [['openalex', 'OpenAlex'], ['crossref', 'CrossRef'], ['semanticscholar', 'Semantic Scholar']]) {
+    // Phase 15 #3 — Semantic Scholar is now the default again. The
+    // throttle-and-retry layers added in Phase 14 C.4 made it reliable
+    // enough to lead with: 1 req/sec client-side throttle, exponential
+    // backoff on 429, and a one-click OpenAlex fallback when all retries
+    // exhaust. Order in the select reflects the new priority.
+    for (const [v, l] of [['semanticscholar', 'Semantic Scholar'], ['openalex', 'OpenAlex'], ['crossref', 'CrossRef']]) {
       const o = document.createElement('option');
       o.value = v; o.textContent = l;
       provSelect.appendChild(o);
     }
-    providerWrap.appendChild(provLabel);
-    providerWrap.appendChild(document.createElement('br'));
-    providerWrap.appendChild(provSelect);
+    provBlock.appendChild(provSelect);
+    providerWrap.appendChild(provBlock);
+
+    // Phase 15 #7 — page size combobox.
+    const sizeBlock = document.createElement('div');
+    const sizeLabel = document.createElement('label');
+    const sizeId = 'add-search-page-size';
+    sizeLabel.setAttribute('for', sizeId);
+    sizeLabel.textContent = 'Results per page';
+    sizeBlock.appendChild(sizeLabel);
+    sizeBlock.appendChild(document.createElement('br'));
+    const sizeSelect = document.createElement('select');
+    sizeSelect.id = sizeId;
+    sizeSelect.setAttribute('data-search-page-size', '');
+    for (const n of [10, 25, 50, 100, 500]) {
+      const o = document.createElement('option');
+      o.value = String(n); o.textContent = String(n);
+      sizeSelect.appendChild(o);
+    }
+    sizeSelect.value = '10';
+    sizeBlock.appendChild(sizeSelect);
+    providerWrap.appendChild(sizeBlock);
+
     form.appendChild(providerWrap);
 
     // Submit + Cancel ---------------------------------------------------
@@ -150,6 +183,76 @@
     results.setAttribute('data-search-results', '');
     form.appendChild(results);
 
+    // Phase 15 #8 — pagination controls. Hidden until a search returns
+    // results; always rendered to the DOM so screen readers can find it
+    // by reverse traversal from the results region. role="navigation"
+    // gives an explicit landmark with the page-status text as its name.
+    const pager = document.createElement('nav');
+    pager.setAttribute('data-search-pager', '');
+    pager.setAttribute('aria-label', 'Search results pages');
+    pager.style.cssText = 'display:none;gap:0.5rem;align-items:center;margin-block-start:0.5rem;';
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.setAttribute('data-search-prev', '');
+    prevBtn.textContent = 'Previous page';
+    prevBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.setAttribute('data-search-next', '');
+    nextBtn.textContent = 'Next page';
+    nextBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    const pageStatus = document.createElement('span');
+    pageStatus.setAttribute('data-search-page-status', '');
+    pager.appendChild(prevBtn);
+    pager.appendChild(nextBtn);
+    pager.appendChild(pageStatus);
+    form.appendChild(pager);
+
+    // Phase 15 — search state lives on a per-form context object so the
+    // page-change handlers and the focus-return path can read/update
+    // shared values without prop-drilling.
+    const ctx = {
+      form, input, provSelect, sizeSelect, error, recovery, status, results,
+      pager, prevBtn, nextBtn, pageStatus, opts, handle,
+      offset: 0,
+      lastTotal: 0,
+      lastPickedKey: null, // identifies the Select button to refocus on save
+      // Phase 16 #3 — pin the provider that produced the displayed
+      // results. Pagination uses this rather than re-reading provSelect,
+      // so a fallback to OpenAlex (or any external mutation of the select)
+      // does not silently swap providers when paginating.
+      activeProvider: null,
+      // Phase 16 #2 — remember which pager button the user pressed so
+      // focus can be restored to it after the next render. The new node
+      // is a different DOM element so we must look it up by data-attr.
+      pendingFocus: null, // 'prev' | 'next' | null
+    };
+
+    prevBtn.addEventListener('click', () => {
+      const limit = parseInt(sizeSelect.value, 10) || 10;
+      ctx.offset = Math.max(0, ctx.offset - limit);
+      ctx.pendingFocus = 'prev';
+      runSearch(ctx, { keepOffset: true, provider: ctx.activeProvider });
+    });
+    nextBtn.addEventListener('click', () => {
+      const limit = parseInt(sizeSelect.value, 10) || 10;
+      ctx.offset = ctx.offset + limit;
+      ctx.pendingFocus = 'next';
+      runSearch(ctx, { keepOffset: true, provider: ctx.activeProvider });
+    });
+    sizeSelect.addEventListener('change', () => {
+      ctx.offset = 0;
+      // Only re-search if there's already a query / results.
+      if (results.children.length > 0) runSearch(ctx, { keepOffset: true, provider: ctx.activeProvider });
+    });
+    // Phase 16 #3 — manual provider change resets pagination and re-runs.
+    provSelect.addEventListener('change', () => {
+      if (results.children.length > 0) {
+        ctx.offset = 0;
+        runSearch(ctx);
+      }
+    });
+
     // Mode change handler -----------------------------------------------
     function onModeChange() {
       const mode = currentMode(form);
@@ -164,12 +267,14 @@
     // Submit handler ----------------------------------------------------
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      runSearch({ form, input, provSelect, error, recovery, status, results, opts, handle });
+      ctx.offset = 0;
+      runSearch(ctx);
     });
     submit.addEventListener('click', (e) => {
       // Without a real <form>.submit in jsdom we trigger the same handler.
       e.preventDefault();
-      runSearch({ form, input, provSelect, error, recovery, status, results, opts, handle });
+      ctx.offset = 0;
+      runSearch(ctx);
     });
 
     // Initial focus on the input.
@@ -183,10 +288,13 @@
     return r ? r.value : 'keyword';
   }
 
-  async function runSearch({ form, input, provSelect, error, recovery, status, results, opts, handle }) {
+  async function runSearch(ctx, runOpts) {
+    runOpts = runOpts || {};
+    const { form, input, provSelect, sizeSelect, error, recovery, status, results, opts, handle } = ctx;
     error.textContent = '';
     if (recovery) recovery.innerHTML = '';
     results.innerHTML = '';
+    hidePager(ctx);
     const mode = currentMode(form);
     const query = (input.value || '').trim();
     if (!query) {
@@ -199,6 +307,14 @@
       error.textContent = 'Search providers not loaded.';
       return;
     }
+    const limit = sizeSelect ? (parseInt(sizeSelect.value, 10) || 10) : 10;
+    const offset = runOpts.keepOffset ? ctx.offset : 0;
+    ctx.offset = offset;
+    // Phase 16 #3 — pagination passes the pinned provider so an earlier
+    // OpenAlex fallback (or any provider switch) doesn't silently change
+    // providers when stepping through pages. New searches read the live
+    // <select>.
+    const provider = runOpts.provider || provSelect.value;
     // Phase 13 a11y review (M4): the status node is role=status, so
     // updating its text content is the announcement — do not also call
     // GitCiteAnnounce.polite (avoids double-announce).
@@ -206,9 +322,22 @@
     try {
       const out = mode === 'doi'
         ? await Providers.byDoi(query)
-        : await Providers.search({ provider: provSelect.value, mode, query, limit: 10, offset: 0 });
-      status.textContent = `${out.results.length} of ${out.total} results`;
-      renderResults(results, out, opts, handle);
+        : await Providers.search({ provider, mode, query, limit, offset });
+      ctx.lastTotal = out.total;
+      ctx.activeProvider = mode === 'doi' ? null : provider;
+      updatePager(ctx, out, limit, offset);
+      renderResults(ctx, out);
+      // Phase 16 #2 — restore focus to the pager button the user clicked.
+      // If that button is now disabled (e.g., reached the first/last page),
+      // fall back to the other pager button so focus stays in the pager.
+      if (ctx.pendingFocus) {
+        const want = ctx.pendingFocus;
+        ctx.pendingFocus = null;
+        const target = (want === 'prev' && !ctx.prevBtn.disabled) ? ctx.prevBtn
+          : (want === 'next' && !ctx.nextBtn.disabled) ? ctx.nextBtn
+          : (!ctx.nextBtn.disabled ? ctx.nextBtn : !ctx.prevBtn.disabled ? ctx.prevBtn : null);
+        if (target) { try { target.focus(); } catch (_) {} }
+      }
     } catch (e) {
       const msg = (e && e.message) || 'Search failed';
       const code = e && e.code;
@@ -216,16 +345,16 @@
       // when the failure is on the Semantic Scholar path.
       if (code === 'rate-limit') {
         error.textContent = 'Semantic Scholar is rate-limiting this client. Try OpenAlex (better rate limits) or CrossRef.';
-        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback(ctx, mode);
       } else if (code === 'forbidden') {
         error.textContent = 'Semantic Scholar requires an API key for this volume. Try OpenAlex or CrossRef.';
-        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback(ctx, mode);
       } else if (code === 'network') {
         error.textContent = 'Network error reaching Semantic Scholar. Try OpenAlex or CrossRef.';
-        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback(ctx, mode);
       } else if (code === 'parse') {
         error.textContent = 'Semantic Scholar returned malformed data.';
-        renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode });
+        renderFallback(ctx, mode);
       } else {
         error.textContent = /malformed/i.test(msg) ? 'Malformed DOI — please re-check.' : msg;
       }
@@ -233,7 +362,30 @@
     }
   }
 
-  function renderFallback({ recovery, error, results, input, provSelect, status, opts, handle, mode }) {
+  function hidePager(ctx) {
+    ctx.pager.style.display = 'none';
+    ctx.pageStatus.textContent = '';
+  }
+
+  function updatePager(ctx, out, limit, offset) {
+    const total = out.total || out.results.length;
+    const start = total === 0 ? 0 : offset + 1;
+    const end = Math.min(total, offset + out.results.length);
+    // Phase 15 #8 — status text appears both at the top (status node)
+    // and on the pager (data-search-page-status) so the announcement is
+    // unambiguous and the pager has a visible text label.
+    ctx.status.textContent = total > out.results.length
+      ? `Showing ${start}–${end} of ${total} results`
+      : `${out.results.length} of ${total} results`;
+    ctx.pageStatus.textContent = `Page ${Math.floor(offset / limit) + 1} of ${Math.max(1, Math.ceil(total / limit))}`;
+    ctx.prevBtn.disabled = offset <= 0;
+    ctx.nextBtn.disabled = end >= total;
+    // Show pager only if there is at least one page of overflow OR results exist.
+    ctx.pager.style.display = total > 0 ? 'flex' : 'none';
+  }
+
+  function renderFallback(ctx, mode) {
+    const { recovery, error, results, input, provSelect, status } = ctx;
     const host = recovery || error;
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -248,12 +400,15 @@
       error.textContent = '';
       btn.remove();
       status.textContent = 'Searching…';
+      const limit = ctx.sizeSelect ? (parseInt(ctx.sizeSelect.value, 10) || 10) : 10;
       try {
         const out = await globalThis.GitCiteProviders.search({
-          provider: 'openalex', mode, query: input.value.trim(), limit: 10, offset: 0,
+          provider: 'openalex', mode, query: input.value.trim(), limit, offset: 0,
         });
-        status.textContent = `${out.results.length} of ${out.total} results`;
-        renderResults(results, out, opts, handle);
+        ctx.offset = 0;
+        ctx.lastTotal = out.total;
+        updatePager(ctx, out, limit, 0);
+        renderResults(ctx, out);
       } catch (e) {
         error.textContent = (e && e.message) || 'OpenAlex search failed';
         status.textContent = '';
@@ -265,20 +420,69 @@
     setTimeout(() => { try { btn.focus(); } catch (_) {} }, 0);
   }
 
-  function renderResults(host, out, opts, handle) {
-    host.innerHTML = '';
+  function renderResults(ctx, out) {
+    const { results, opts, handle } = ctx;
+    const limit = ctx.sizeSelect ? (parseInt(ctx.sizeSelect.value, 10) || 10) : 10;
+    const offset = ctx.offset || 0;
+    results.innerHTML = '';
     const Card = globalThis.GitCiteResultCard;
     out.results.forEach((data, i) => {
       const card = Card.render(data, {
-        posinset: i + 1,
+        posinset: offset + i + 1,
         setsize: out.total,
-        onSelect: (d) => {
-          if (typeof opts.onPick === 'function') opts.onPick(d);
-          handle.close();
+        onSelect: (d) => onPickResult(ctx, card, d),
+      });
+      // Phase 15 #4 — tag every Select button with a stable per-result
+      // key so the focus-return path can find it after the edit dialog
+      // closes. doi or url is most stable; fall back to title+offset.
+      const stableKey = (d => d.doi || d.url || `${(d.title || '').slice(0, 40)}|${offset + i}`)(data);
+      const selectBtn = card.querySelector('button');
+      if (selectBtn) selectBtn.setAttribute('data-result-key', stableKey);
+      results.appendChild(card);
+    });
+  }
+
+  function onPickResult(ctx, card, data) {
+    const { opts, handle } = ctx;
+    const selectBtn = card.querySelector('button[data-result-key]');
+    const stableKey = selectBtn ? selectBtn.getAttribute('data-result-key') : null;
+    // Phase 15 #4 — opts.onPick is responsible for opening the edit
+    // dialog with the picked data. Pass a returnFocus callback so the
+    // caller can re-focus the originating Select button once the edit
+    // dialog is dismissed (save or cancel). Fall back: close the dialog
+    // when the consumer didn't opt into the focus-return contract.
+    if (typeof opts.onPick === 'function') {
+      // Track which result the user picked so we can refocus on save.
+      ctx.lastPickedKey = stableKey;
+      const ret = opts.onPick(data, {
+        // Caller invokes this when the edit dialog closes. We restore
+        // focus to the same Select button so resuming the search list is
+        // a single Tab away.
+        returnFocus: () => {
+          // The dialog may have been re-rendered (pagination clicks, new
+          // search), so look up the current button by key rather than
+          // holding a stale node reference.
+          if (!stableKey) return;
+          const live = ctx.results.querySelector(`button[data-result-key="${cssEscape(stableKey)}"]`);
+          if (live) {
+            try { live.focus(); } catch (_) {}
+          }
         },
       });
-      host.appendChild(card);
-    });
+      // Legacy callers (e.g., Phase 13 tests) return undefined and expect
+      // the dialog to close. New callers can return { keepOpen: true } to
+      // keep the search modal open while the edit dialog is layered on top.
+      if (!ret || !ret.keepOpen) {
+        handle.close();
+      }
+    } else {
+      handle.close();
+    }
+  }
+
+  function cssEscape(s) {
+    if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/(["\\\]])/g, '\\$1');
   }
 
   globalThis.GitCiteAddSearch = { open };

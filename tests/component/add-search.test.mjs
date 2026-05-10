@@ -183,4 +183,216 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     expect(results).toBeTruthy();
     expect(results.getAttribute('role')).toBeNull();
   });
+
+  it('Phase 15 #3 — Semantic Scholar is the default provider in the select', () => {
+    AddSearch.open({});
+    const ss = document.querySelector('dialog [data-search-provider]');
+    expect(ss.value).toBe('semanticscholar');
+  });
+
+  it('Phase 15 #7 — exposes a "Results per page" combobox with 10/25/50/100/500', () => {
+    AddSearch.open({});
+    const sel = document.querySelector('dialog [data-search-page-size]');
+    expect(sel).toBeTruthy();
+    const values = Array.from(sel.querySelectorAll('option')).map((o) => o.value);
+    expect(values).toEqual(['10', '25', '50', '100', '500']);
+    expect(sel.value).toBe('10');
+  });
+
+  it('Phase 15 #7 — the chosen page size flows through to providers.search as `limit`', async () => {
+    const { search } = fakeProviders();
+    AddSearch.open({});
+    const sel = document.querySelector('dialog [data-search-page-size]');
+    sel.value = '50';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(search).toHaveBeenCalled();
+    const call = search.mock.calls.at(-1)[0];
+    expect(call.limit).toBe(50);
+  });
+
+  it('Phase 15 #8 — pagination Next button increments offset and re-fetches', async () => {
+    const search = vi.fn(async (opts) => ({
+      results: [{ title: `T${opts.offset}`, authors: 'A', year: '2024', doi: '', url: 'https://x' }],
+      total: 100,
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const next = document.querySelector('dialog [data-search-next]');
+    expect(next).toBeTruthy();
+    expect(next.disabled).toBe(false);
+    next.click();
+    await new Promise((r) => setTimeout(r, 0));
+    const lastCall = search.mock.calls.at(-1)[0];
+    expect(lastCall.offset).toBe(10);
+  });
+
+  it('Phase 15 #8 — Previous button is disabled on the first page', async () => {
+    AddSearch.open({});
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const prev = document.querySelector('dialog [data-search-prev]');
+    expect(prev.disabled).toBe(true);
+  });
+
+  it('Phase 15 #8 — status text shows "Showing N–M of T" when paginating', async () => {
+    const search = vi.fn(async (opts) => ({
+      results: Array.from({ length: 10 }, (_, i) => ({
+        title: `T${opts.offset + i}`, authors: 'A', year: '2024', doi: '', url: 'https://x',
+      })),
+      total: 100,
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const status = document.querySelector('dialog [data-search-status]');
+    expect(status.textContent).toMatch(/Showing 1[–-]10 of 100/);
+  });
+
+  it('Phase 15 #4 — onPick receives a returnFocus callback as its second arg', async () => {
+    const onPick = vi.fn(() => ({ keepOpen: true }));
+    AddSearch.open({ onPick });
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    document.querySelector('dialog [data-search-results] button').click();
+    expect(onPick).toHaveBeenCalled();
+    const ctx = onPick.mock.calls[0][1];
+    expect(ctx).toBeTruthy();
+    expect(typeof ctx.returnFocus).toBe('function');
+    // The dialog should still be present because keepOpen: true.
+    expect(document.querySelector('dialog[data-gitcite-dialog]')).toBeTruthy();
+  });
+
+  it('Phase 15 #4 — returnFocus() puts focus on the originating Select button', async () => {
+    AddSearch.open({
+      onPick: (data, ctx) => { setTimeout(() => ctx.returnFocus(), 0); return { keepOpen: true }; },
+    });
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const selectBtn = document.querySelector('dialog [data-search-results] button');
+    expect(selectBtn.getAttribute('data-result-key')).toBeTruthy();
+    selectBtn.click();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(document.activeElement).toBe(selectBtn);
+  });
+
+  it('Phase 15 (legacy contract) — onPick that returns undefined still closes the dialog', async () => {
+    const onPick = vi.fn();
+    AddSearch.open({ onPick });
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    document.querySelector('dialog [data-search-results] button').click();
+    expect(onPick).toHaveBeenCalled();
+    expect(document.querySelector('dialog[data-gitcite-dialog]')).toBeNull();
+  });
+
+  it('Phase 16 #2 — Next click moves focus back to the Next button after re-render', async () => {
+    const search = vi.fn(async (opts) => ({
+      results: Array.from({ length: 10 }, (_, i) => ({
+        title: `T${opts.offset + i}`, authors: 'A', year: '2024', doi: '', url: `https://x/${opts.offset + i}`,
+      })),
+      total: 100,
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const next = document.querySelector('dialog [data-search-next]');
+    next.click();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(document.activeElement).toBe(next);
+  });
+
+  it('Phase 16 #2 — Previous click puts focus back on the Previous button', async () => {
+    const search = vi.fn(async (opts) => ({
+      results: Array.from({ length: 10 }, (_, i) => ({
+        title: `T${opts.offset + i}`, authors: 'A', year: '2024', doi: '', url: `https://x/${opts.offset + i}`,
+      })),
+      total: 100,
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const next = document.querySelector('dialog [data-search-next]');
+    next.click();
+    await new Promise((r) => setTimeout(r, 5));
+    // Now on page 2 — go back.
+    const prev = document.querySelector('dialog [data-search-prev]');
+    prev.click();
+    await new Promise((r) => setTimeout(r, 5));
+    // Prev becomes disabled on page 1; focus should move to next instead.
+    const nextNow = document.querySelector('dialog [data-search-next]');
+    expect(document.activeElement).toBe(nextNow);
+  });
+
+  it('Phase 16 #3 — pagination uses the SAME provider that produced the current results', async () => {
+    const search = vi.fn(async (opts) => ({
+      results: [{ title: `from-${opts.provider}-${opts.offset}`, authors: 'A', year: '2024', doi: '', url: 'https://x' }],
+      total: 100,
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    // Default provider is semanticscholar.
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(search.mock.calls.at(-1)[0].provider).toBe('semanticscholar');
+    // Mutate the <select> AFTER the search ran — pagination must
+    // ignore the new value and stick with the active provider.
+    const provSel = document.querySelector('dialog [data-search-provider]');
+    provSel.value = 'openalex';
+    // Simulate next-page click without firing 'change' on provSel
+    // (keypaths the code: pendingFocus + ctx.activeProvider).
+    document.querySelector('dialog [data-search-next]').click();
+    await new Promise((r) => setTimeout(r, 5));
+    const lastCall = search.mock.calls.at(-1)[0];
+    expect(lastCall.provider).toBe('semanticscholar');
+    expect(lastCall.offset).toBe(10);
+  });
+
+  it('Phase 16 #3 — manually changing the provider resets pagination and re-runs', async () => {
+    const search = vi.fn(async (opts) => ({
+      results: [{ title: `from-${opts.provider}-${opts.offset}`, authors: 'A', year: '2024', doi: '', url: 'https://x' }],
+      total: 100,
+    }));
+    globalThis.GitCiteProviders = { search, byDoi: vi.fn() };
+    AddSearch.open({});
+    const input = document.querySelector('dialog input[data-search-input]');
+    input.value = 'urban';
+    document.querySelector('dialog [data-search-submit]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    document.querySelector('dialog [data-search-next]').click(); // → offset 10
+    await new Promise((r) => setTimeout(r, 5));
+    const provSel = document.querySelector('dialog [data-search-provider]');
+    provSel.value = 'crossref';
+    provSel.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 5));
+    const lastCall = search.mock.calls.at(-1)[0];
+    expect(lastCall.provider).toBe('crossref');
+    expect(lastCall.offset).toBe(0);
+  });
 });

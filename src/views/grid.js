@@ -24,10 +24,10 @@
 // Keyboard:
 //   ←/→/↑/↓             move one cell
 //   Home/End            first/last cell of current row
-//   Ctrl+Home /         header row, first column
-//   Ctrl+ArrowUp        (alias) header row, first column
-//   Ctrl+End /          last data row, last column
-//   Ctrl+ArrowDown      (alias) last data row, last column
+//   Ctrl+Home           header row, first column (corner)
+//   Ctrl+End            last data row, last column (corner)
+//   Ctrl+ArrowUp        header row at CURRENT column (Phase 15 #1)
+//   Ctrl+ArrowDown      last data row at CURRENT column (Phase 15 #1)
 //   Ctrl+ArrowLeft      first cell of current row (alias for Home)
 //   Ctrl+ArrowRight     last cell of current row (alias for End)
 //   PageUp/Down         move one viewport
@@ -56,6 +56,16 @@
   ];
   const ROW_HEIGHT = 56;
   const HEADER_ROW = -1;
+  // Phase 15 #2 / Phase 16 #12 — Render-all threshold. Below this,
+  // virtualization is skipped entirely: every row renders as DOM. This is
+  // the AG-Grid "domLayout: 'normal'" / Apex "no-virtual" pattern — far
+  // simpler and more robust than windowing for typical academic libraries.
+  // Bumped from 500 to 5000 in Phase 16 after the user reported the
+  // virtualized path still stalling on a 973-entry corpus. 5000 rows × 6
+  // columns = 30k cells; modern browsers paint that in well under 200ms,
+  // and skipping virtualization eliminates every scroll/resize race the
+  // windowed path could hit.
+  const VIRTUALIZE_THRESHOLD = 5000;
 
   let _host = null;
   let _table = null;        // native <table role="grid">
@@ -193,6 +203,8 @@
     table.addEventListener('keydown', onKeydown);
     table.addEventListener('click', onClick);
     scrollHost.addEventListener('scroll', () => {
+      // Render-all path doesn't virtualize on scroll.
+      if (_view.length <= VIRTUALIZE_THRESHOLD) return;
       // Skip when the keyboard path already rendered for this scrollTop.
       if (_expectedScroll >= 0 && Math.abs(_scrollHost.scrollTop - _expectedScroll) < 2) {
         _expectedScroll = -1;
@@ -201,6 +213,18 @@
       _expectedScroll = -1;
       render();
     });
+
+    // Phase 15 #2 — when the host is hidden/zero-height at mount time
+    // (e.g., behind a tab switch or before flexbox lays out), re-render
+    // once it gains size so the visible window is computed correctly.
+    if (typeof ResizeObserver !== 'undefined') {
+      try {
+        const ro = new ResizeObserver(() => {
+          if (_view.length > VIRTUALIZE_THRESHOLD) render();
+        });
+        ro.observe(scrollHost);
+      } catch (_) { /* jsdom etc. */ }
+    }
   }
 
   function update(entries) {
@@ -356,8 +380,10 @@
     // Phase 14 A.3/A.4 — Ctrl+arrow aliases. Tested before plain arrows
     // because plain ArrowUp/Down handlers must not swallow the ctrl
     // variant.
-    if (ctrl && key === 'ArrowUp')    { e.preventDefault(); focusCell({ row: HEADER_ROW, col: 0 }); return; }
-    if (ctrl && key === 'ArrowDown')  { e.preventDefault(); focusCell({ row: _view.length - 1, col: COLUMNS.length - 1 }); return; }
+    // Phase 15 #1 — Ctrl+Up/Down preserve the user's current column. Use
+    // Ctrl+Home / Ctrl+End for the corner shortcuts (top-left / bottom-right).
+    if (ctrl && key === 'ArrowUp')    { e.preventDefault(); focusCell({ row: HEADER_ROW, col: _focusCol }); return; }
+    if (ctrl && key === 'ArrowDown')  { e.preventDefault(); focusCell({ row: _view.length - 1, col: _focusCol }); return; }
     if (ctrl && key === 'ArrowLeft')  { e.preventDefault(); focusCell({ row: _focusRow, col: 0 }); return; }
     if (ctrl && key === 'ArrowRight') { e.preventDefault(); focusCell({ row: _focusRow, col: COLUMNS.length - 1 }); return; }
 
@@ -427,22 +453,30 @@
       return;
     }
 
-    const vh = _scrollHost.clientHeight || (_host && _host.clientHeight) || 600;
-    const scroll = _scrollHost.scrollTop || 0;
-    const startIdx = Math.max(0, Math.floor(scroll / ROW_HEIGHT) - 5);
-    const endIdx = Math.min(total, Math.ceil((scroll + vh) / ROW_HEIGHT) + 5);
-    let visStart = startIdx;
-    let visEnd = endIdx;
-    if (_focusRow >= 0 && _focusRow < total) {
-      if (_focusRow < visStart) visStart = _focusRow;
-      if (_focusRow >= visEnd) visEnd = _focusRow + 1;
+    let visStart;
+    let visEnd;
+    if (total <= VIRTUALIZE_THRESHOLD) {
+      // Phase 15 #2 — render-all path. No virtualization, no scroll
+      // dependency, no race conditions. Spacers collapse to 0 height.
+      visStart = 0;
+      visEnd = total;
+      _topSpacer.firstChild.style.height = '0';
+      _bottomSpacer.firstChild.style.height = '0';
+    } else {
+      // Windowed path for very large libraries.
+      const vh = _scrollHost.clientHeight || (_host && _host.clientHeight) || 600;
+      const scroll = _scrollHost.scrollTop || 0;
+      const startIdx = Math.max(0, Math.floor(scroll / ROW_HEIGHT) - 5);
+      const endIdx = Math.min(total, Math.ceil((scroll + vh) / ROW_HEIGHT) + 5);
+      visStart = startIdx;
+      visEnd = endIdx;
+      if (_focusRow >= 0 && _focusRow < total) {
+        if (_focusRow < visStart) visStart = _focusRow;
+        if (_focusRow >= visEnd) visEnd = _focusRow + 1;
+      }
+      _topSpacer.firstChild.style.height = (visStart * ROW_HEIGHT) + 'px';
+      _bottomSpacer.firstChild.style.height = ((total - visEnd) * ROW_HEIGHT) + 'px';
     }
-
-    // Spacer rows hold the unrendered regions' height. height on a <td>
-    // does not break native table semantics — it just sets the row
-    // height. Native NVDA table-mode entry continues to work.
-    _topSpacer.firstChild.style.height = (visStart * ROW_HEIGHT) + 'px';
-    _bottomSpacer.firstChild.style.height = ((total - visEnd) * ROW_HEIGHT) + 'px';
 
     // Insert visible rows BEFORE the bottom spacer so they sit between
     // the two spacers in DOM order — preserving aria-rowindex semantics

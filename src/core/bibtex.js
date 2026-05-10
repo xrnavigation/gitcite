@@ -207,7 +207,11 @@
   function serialiseEntry(e) {
     const lines = [];
     lines.push(`@${e.type}{${e.key},`);
-    const names = Object.keys(e.fields);
+    // Phase 16 #7 — never emit a "key" field. The citation key already
+    // lives in @type{KEY,…}; emitting it again as a field is invalid
+    // BibTeX and round-trips badly. Some imports (older CSV mappings)
+    // accidentally store the key as a field; strip it on output.
+    const names = Object.keys(e.fields).filter((k) => k.toLowerCase() !== 'key');
     for (let j = 0; j < names.length; j++) {
       const k = names[j];
       const sep = j === names.length - 1 ? '' : ',';
@@ -250,11 +254,35 @@
     return parts[parts.length - 1] || '';
   }
 
-  function cleanTitle(t) {
-    return asciiFold(String(t || ''))
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '')
-      .slice(0, 20);
+  // Phase 16 #5 — stop-word list for citation-key first-word selection.
+  // Standard English title stop words; first non-stop-word from the title
+  // becomes the third segment of the key (e.g. "The Tactile Map" → "Tactile").
+  const STOP_WORDS = new Set([
+    'a', 'an', 'the',
+    'of', 'on', 'in', 'at', 'by', 'for', 'with', 'to', 'from', 'into', 'onto', 'upon',
+    'and', 'or', 'but', 'nor', 'so', 'yet',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'am',
+    'has', 'have', 'had', 'do', 'does', 'did',
+    'as', 'if', 'than', 'that', 'this', 'these', 'those',
+    'about', 'after', 'before', 'over', 'under', 'between', 'through', 'during',
+    'no', 'not',
+  ]);
+
+  function titleCaseAscii(s) {
+    const ascii = asciiFold(String(s || '')).replace(/[^A-Za-z]/g, '');
+    if (!ascii) return '';
+    return ascii.charAt(0).toUpperCase() + ascii.slice(1).toLowerCase();
+  }
+
+  function firstSignificantWord(title) {
+    const words = asciiFold(String(title || ''))
+      .split(/[^A-Za-z0-9]+/)
+      .filter(Boolean);
+    for (const w of words) {
+      if (!STOP_WORDS.has(w.toLowerCase())) return w;
+    }
+    // All words were stop words (or empty) — fall back to first word.
+    return words[0] || '';
   }
 
   function suffixFor(idx) {
@@ -270,14 +298,31 @@
     return s;
   }
 
-  function makeCitationKey({ author, year, title }, opts = {}) {
-    const last = asciiFold(lastNameOf(author)).toLowerCase().replace(/[^a-z]/g, '');
-    const y = String(year || '').replace(/\D/g, '');
-    const t = cleanTitle(title);
-    const exists = opts.exists || new Set();
+  // Phase 16 #5 — citation keys are now LastNameYearFirstWord (e.g.
+  // Biggs2022Tactile). Stop-word-aware: "The Tactile Map" → "Tactile".
+  // Backwards compatible with the legacy collision-resolution argument:
+  //   makeCitationKey(parts)                       — no collision check
+  //   makeCitationKey(parts, { exists: Set })      — Set of existing keys
+  //   makeCitationKey(parts, modelByKey: Map)      — Map.has(key) treated as Set.has
+  function makeCitationKey({ author, year, title } = {}, opts) {
+    const last = titleCaseAscii(lastNameOf(author)) || 'Anon';
+    const y = String(year || '').replace(/\D/g, '').slice(0, 4);
+    const word = titleCaseAscii(firstSignificantWord(title));
+    const base = `${last}${y}${word}`;
+    let exists = null;
+    if (opts) {
+      if (opts instanceof Set) exists = opts;
+      else if (opts instanceof Map) exists = { has: (k) => opts.has(k) };
+      else if (opts.exists) {
+        exists = (opts.exists instanceof Set || opts.exists instanceof Map)
+          ? { has: (k) => opts.exists.has(k) }
+          : null;
+      }
+    }
+    if (!exists) return base;
     let i = 0;
     while (true) {
-      const key = `${last}${suffixFor(i)}:${y}:${t}`;
+      const key = `${last}${suffixFor(i)}${y}${word}`;
       if (!exists.has(key)) return key;
       i++;
       if (i > 1000) throw new Error('citation-key collision overflow');

@@ -38,6 +38,13 @@
       b.textContent = it.label;
       b.setAttribute('tabindex', i === 0 ? '0' : '-1');
       b.style.cssText = 'min-block-size:44px;min-inline-size:44px;padding:0.25rem 0.5rem;';
+      // Phase 15 — optional title (tooltip) for additional context. The
+      // visible label remains the accessible name; title is supplementary.
+      if (it.title) b.setAttribute('title', it.title);
+      // Phase 16 #1 — initial disabled state from the items config so
+      // toolbars can ship with state-dependent buttons (e.g. Find/Replace
+      // disabled when the library is empty).
+      if (it.disabled) b.disabled = true;
       b.addEventListener('click', () => {
         if (typeof opts.onAction === 'function') opts.onAction(it.id);
       });
@@ -65,7 +72,21 @@
     });
 
     host.appendChild(tb);
+
+    // Phase 16 #1 — expose a setEnabled() so app.js can toggle button
+    // state (e.g. Find/Replace) without rebuilding the toolbar and
+    // resetting the user's roving-tabindex position.
+    function setEnabled(id, enabled) {
+      const b = tb.querySelector(`[data-toolbar-item="${id}"]`);
+      if (!b) return;
+      b.disabled = !enabled;
+    }
+    host._gitciteToolbar = { setEnabled };
   }
 
-  globalThis.GitCiteHeaderToolbar = { mount };
+  function setEnabled(host, id, enabled) {
+    if (host && host._gitciteToolbar) host._gitciteToolbar.setEnabled(id, enabled);
+  }
+
+  globalThis.GitCiteHeaderToolbar = { mount, setEnabled };
 })();

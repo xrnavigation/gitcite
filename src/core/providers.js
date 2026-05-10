@@ -36,11 +36,21 @@
   function setCached(k, value) { cache.set(k, { at: Date.now(), value }); }
 
   // ---- Semantic Scholar throttle + retry --------------------------------
+  // Phase 16 #4 — bumped throttle to 1500 ms after the user kept hitting
+  // network errors at 1 req/sec. Semantic Scholar's anonymous endpoint is
+  // intermittently aggressive — the published guidance is "polite is
+  // around 1 req/sec" but in practice the unauth tier gets bursty 429s
+  // even at exactly 1 req/sec. 1500 ms gives a comfortable margin.
+  const SS_MIN_INTERVAL_MS = 1500;
+  // Semantic Scholar's documented `limit` cap is 100; passing more
+  // returns 400 ("Bad Request"). We honour the user's selected page size
+  // for OpenAlex / CrossRef but clamp it for SS.
+  const SS_MAX_LIMIT = 100;
   let _ssLastAt = 0;
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   async function ssThrottle() {
     const now = Date.now();
-    const wait = Math.max(0, 1000 - (now - _ssLastAt));
+    const wait = Math.max(0, SS_MIN_INTERVAL_MS - (now - _ssLastAt));
     if (wait > 0) await sleep(wait);
     _ssLastAt = Date.now();
   }
@@ -56,7 +66,11 @@
     if (hit) return hit;
     const url = new URL('https://api.semanticscholar.org/graph/v1/paper/search');
     url.searchParams.set('query', p.query);
-    url.searchParams.set('limit', String(p.limit || 10));
+    // Phase 16 #4 — clamp to Semantic Scholar's documented max so the
+    // user's "Results per page = 500" choice doesn't make every SS
+    // request fail with HTTP 400.
+    const ssLimit = Math.min(p.limit || 10, SS_MAX_LIMIT);
+    url.searchParams.set('limit', String(ssLimit));
     url.searchParams.set('offset', String(p.offset || 0));
     url.searchParams.set('fields', 'title,authors,venue,year,externalIds,abstract,citationCount,openAccessPdf');
 
@@ -93,10 +107,26 @@
         continue;
       }
       if (r.status === 403) throw Object.assign(new Error('Semantic Scholar requires an API key'), { code: 'forbidden' });
-      if (!r.ok) throw new Error('Semantic Scholar error ' + r.status);
+      if (!r.ok) {
+        // Phase 16 #4 — surface the server's own error body when Semantic
+        // Scholar returns 4xx/5xx so the user sees the underlying reason
+        // (e.g. "limit must be <= 100", "query parameter required").
+        let bodySnippet = '';
+        try { bodySnippet = (await r.text()).slice(0, 200); } catch (_) {}
+        throw Object.assign(
+          new Error(`Semantic Scholar error ${r.status}${bodySnippet ? ': ' + bodySnippet : ''}`),
+          { code: 'http-' + r.status, status: r.status, body: bodySnippet },
+        );
+      }
       let data;
       try { data = await r.json(); }
       catch (e) { throw Object.assign(new Error('Semantic Scholar returned malformed data'), { code: 'parse' }); }
+      // Phase 16 #4 — Semantic Scholar can return 200 with an `error`
+      // field instead of an HTTP error code in some failure modes
+      // (their internal indexer is occasionally slow). Detect that.
+      if (data && typeof data === 'object' && data.error) {
+        throw Object.assign(new Error('Semantic Scholar: ' + data.error), { code: 'upstream-error', upstream: data.error });
+      }
       const out = {
         results: (data.data || []).map((x) => ({
           title: x.title,

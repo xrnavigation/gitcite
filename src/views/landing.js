@@ -19,6 +19,38 @@
     heading.setAttribute('tabindex', '-1');
     host.appendChild(heading);
 
+    // Phase 16 #13 — "Open library file" button. When the File System
+    // Access API is available, this picks an existing .bib and keeps a
+    // live link so subsequent saves write back to the same file. When
+    // FSA is not available (Firefox), it falls back to ingest-only and
+    // the rest of the import buttons handle the workflow.
+    const FB = globalThis.GitCiteFileBridge;
+    if (FB && FB.isSupported && FB.isSupported()) {
+      const openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.setAttribute('data-open-library', '');
+      openBtn.textContent = 'Open library file (live link)';
+      openBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-block-end:0.5rem;';
+      openBtn.addEventListener('click', async () => {
+        try {
+          const r = await FB.open();
+          if (typeof opts.onOpen === 'function') opts.onOpen(r);
+          else if (typeof opts.onBib === 'function') opts.onBib(r.text);
+        } catch (e) {
+          if (e && e.name !== 'AbortError') {
+            // Surface to the user via a toast if available; otherwise alert.
+            if (globalThis.GitCiteToast) globalThis.GitCiteToast.show({ message: 'Open failed: ' + (e.message || e) });
+          }
+        }
+      });
+      host.appendChild(openBtn);
+
+      const liveHint = document.createElement('p');
+      liveHint.textContent = 'Live link: changes you make are saved back to the same file. Choose Import below to load a copy without linking.';
+      liveHint.style.cssText = 'margin:0 0 0.75rem;font-size:0.875rem;color:var(--fg-muted);';
+      host.appendChild(liveHint);
+    }
+
     // Import .bib / .bibtex (file picker)
     const bibBtn = document.createElement('button');
     bibBtn.type = 'button';

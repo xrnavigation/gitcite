@@ -1,8 +1,10 @@
 // Phase 14 Group A — grid keyboard correctness regressions.
+// Phase 15 #1 — Ctrl+Down/Up preserve current column (don't snap to col 0/last).
 //
 // Locks in:
 //   #1  Rapid arrow keys past the rendered window must not lose focus to <body>.
-//   #2  Ctrl+ArrowUp jumps to the absolute top (header row) of the grid.
+//   #2  Ctrl+ArrowUp jumps to the header row at the user's current column.
+//       Ctrl+ArrowDown jumps to the last data row at the user's current column.
 //   #3  Ctrl+ArrowLeft / Ctrl+ArrowRight match Home / End within the row.
 //   #9  The grid uses native <table>/<thead>/<tbody>/<tr>/<th>/<td> so NVDA
 //       table navigation (Ctrl+Alt+arrow) works.
@@ -111,7 +113,7 @@ describe('Phase 14 A — Ctrl+arrow keyboard model (#2, #3)', () => {
   let Grid;
   beforeEach(() => { Grid = load(); });
 
-  it('Ctrl+ArrowUp jumps to the header row from anywhere', () => {
+  it('Ctrl+ArrowUp jumps to the header row at the SAME column (preserving col)', () => {
     const h = host();
     Grid.mount(h, {});
     Grid.update(makeEntries(20));
@@ -119,17 +121,41 @@ describe('Phase 14 A — Ctrl+arrow keyboard model (#2, #3)', () => {
     dispatchKey(activeCell(), 'ArrowUp', { ctrlKey: true });
     const c = activeCell();
     expect(c.getAttribute('data-row')).toBe('-1');
-    expect(c.getAttribute('data-col')).toBe('0');
+    // Phase 15 #1 — column is preserved, not reset to 0.
+    expect(c.getAttribute('data-col')).toBe('3');
   });
 
-  it('Ctrl+ArrowDown jumps to the last data row, last column', () => {
+  it('Ctrl+ArrowDown jumps to the last data row at the SAME column (preserving col)', () => {
     const h = host();
     Grid.mount(h, {});
     Grid.update(makeEntries(20));
-    Grid.focusCell({ row: 5, col: 0 });
+    Grid.focusCell({ row: 5, col: 2 });
     dispatchKey(activeCell(), 'ArrowDown', { ctrlKey: true });
     const c = activeCell();
     expect(c.getAttribute('data-row')).toBe('19');
+    // Phase 15 #1 — column is preserved, not snapped to last column.
+    expect(c.getAttribute('data-col')).toBe('2');
+  });
+
+  it('Ctrl+Home still goes to header row, first column (corner shortcut intact)', () => {
+    const h = host();
+    Grid.mount(h, {});
+    Grid.update(makeEntries(10));
+    Grid.focusCell({ row: 5, col: 3 });
+    dispatchKey(activeCell(), 'Home', { ctrlKey: true });
+    const c = activeCell();
+    expect(c.getAttribute('data-row')).toBe('-1');
+    expect(c.getAttribute('data-col')).toBe('0');
+  });
+
+  it('Ctrl+End still goes to last data row, last column (corner shortcut intact)', () => {
+    const h = host();
+    Grid.mount(h, {});
+    Grid.update(makeEntries(10));
+    Grid.focusCell({ row: 0, col: 0 });
+    dispatchKey(activeCell(), 'End', { ctrlKey: true });
+    const c = activeCell();
+    expect(c.getAttribute('data-row')).toBe('9');
     expect(c.getAttribute('data-col')).toBe('5');
   });
 
@@ -153,6 +179,31 @@ describe('Phase 14 A — Ctrl+arrow keyboard model (#2, #3)', () => {
     const c = activeCell();
     expect(c.getAttribute('data-row')).toBe('2');
     expect(c.getAttribute('data-col')).toBe('5');
+  });
+});
+
+describe('Phase 15 #2 — render-all path (small libraries skip virtualization)', () => {
+  let Grid;
+  beforeEach(() => { Grid = load(); });
+
+  it('renders every data row when total <= 500, regardless of viewport height', () => {
+    // Even with a 200px viewport (which previously rendered ~5 rows due to
+    // windowing), 50 entries must all be in the DOM.
+    const h = host(200);
+    Grid.mount(h, {});
+    Grid.update(makeEntries(50));
+    const trs = h.querySelectorAll('tbody tr[data-row]');
+    expect(trs.length).toBe(50);
+  });
+
+  it('renders every data row even when scrollHost.clientHeight is 0 at mount time', () => {
+    const h = document.createElement('div');
+    Object.defineProperty(h, 'clientHeight', { configurable: true, get: () => 0 });
+    document.body.appendChild(h);
+    Grid.mount(h, {});
+    Grid.update(makeEntries(20));
+    const trs = h.querySelectorAll('tbody tr[data-row]');
+    expect(trs.length).toBe(20);
   });
 });
 

@@ -159,33 +159,57 @@ describe('serialiser — round-trip fidelity', () => {
   });
 });
 
-describe('makeCitationKey', () => {
-  it('produces lowerlast:year:lowertitle for the spec examples', () => {
-    expect(makeCitationKey({ author: 'Muth, John F.', year: '1969', title: 'Cities' })).toBe('muth:1969:cities');
-    expect(makeCitationKey({ author: 'Alonso, William', year: '1964', title: 'Location' })).toBe('alonso:1964:location');
-    expect(makeCitationKey({ author: 'Keynes, John Maynard', year: '1936', title: 'Employment' })).toBe('keynes:1936:employment');
+describe('makeCitationKey (Phase 16 #5 — LastNameYearFirstWord)', () => {
+  it('produces LastNameYearFirstWord for the spec examples', () => {
+    expect(makeCitationKey({ author: 'Muth, John F.', year: '1969', title: 'Cities' })).toBe('Muth1969Cities');
+    expect(makeCitationKey({ author: 'Alonso, William', year: '1964', title: 'Location' })).toBe('Alonso1964Location');
+    expect(makeCitationKey({ author: 'Biggs, Brandon', year: '2022', title: 'Tactile Map Design' })).toBe('Biggs2022Tactile');
+  });
+
+  it('skips leading stop-words to pick the first significant title word', () => {
+    expect(makeCitationKey({ author: 'Smith', year: '2024', title: 'The Theory of Cities' })).toBe('Smith2024Theory');
+    expect(makeCitationKey({ author: 'Smith', year: '2024', title: 'A Brief History' })).toBe('Smith2024Brief');
+    expect(makeCitationKey({ author: 'Smith', year: '2024', title: 'On the Origin of Species' })).toBe('Smith2024Origin');
   });
 
   it('handles multi-author "and"', () => {
-    expect(makeCitationKey({ author: 'Smith, Alice and Jones, Bob', year: '2024', title: 'Cities' })).toBe('smith:2024:cities');
+    expect(makeCitationKey({ author: 'Smith, Alice and Jones, Bob', year: '2024', title: 'Cities' })).toBe('Smith2024Cities');
   });
 
   it('handles "First Last" form', () => {
-    expect(makeCitationKey({ author: 'Alice Smith', year: '2024', title: 'Cities' })).toBe('smith:2024:cities');
+    expect(makeCitationKey({ author: 'Alice Smith', year: '2024', title: 'Cities' })).toBe('Smith2024Cities');
   });
 
-  it('truncates title to 20 chars after cleaning', () => {
-    const key = makeCitationKey({ author: 'X, Y', year: '2024', title: 'Employment, Interest and Money' });
-    // Cleaned: "employmentinterestandmoney" → truncate 20 → "employmentinterestan"
-    expect(key.split(':')[2].length).toBeLessThanOrEqual(20);
+  it('uses Anon when author is missing', () => {
+    expect(makeCitationKey({ year: '2024', title: 'Cities' })).toBe('Anon2024Cities');
   });
 
   it('appends letter suffix on collision', () => {
-    const exists = new Set(['smith:2024:cities']);
+    const exists = new Set(['Smith2024Cities']);
     const k1 = makeCitationKey({ author: 'Smith', year: '2024', title: 'Cities' }, { exists });
-    expect(k1).toBe('smithb:2024:cities');
+    expect(k1).toBe('Smithb2024Cities');
     exists.add(k1);
     const k2 = makeCitationKey({ author: 'Smith', year: '2024', title: 'Cities' }, { exists });
-    expect(k2).toBe('smithc:2024:cities');
+    expect(k2).toBe('Smithc2024Cities');
+  });
+
+  it('accepts a Map (model.byKey) as the existence check', () => {
+    const byKey = new Map([['Smith2024Cities', { key: 'Smith2024Cities' }]]);
+    expect(makeCitationKey({ author: 'Smith', year: '2024', title: 'Cities' }, byKey)).toBe('Smithb2024Cities');
+  });
+});
+
+describe('serialise (Phase 16 #7 — drop "key" field on output)', () => {
+  it('does not emit a field named "key" — citation key only lives in @type{KEY,…}', () => {
+    const out = serialise({
+      entries: [{
+        type: 'article',
+        key: 'Biggs2022Tactile',
+        fields: { key: 'shouldNotAppear', title: 'Tactile Map Design', author: 'Biggs, Brandon', year: '2022' },
+      }],
+    });
+    expect(out).toMatch(/@article\{Biggs2022Tactile,/);
+    expect(out).not.toMatch(/^\s*key\s*=/m);
+    expect(out).toMatch(/title = \{Tactile Map Design\}/);
   });
 });
