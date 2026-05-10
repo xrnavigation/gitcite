@@ -46,16 +46,56 @@
 
   if (globalThis.GitCiteGrid) return;
 
-  // Phase 17 #8 — column registry. Settings can reorder + show/hide
-  // these by mutating the live COLUMNS array via applyColumnPrefs().
-  const ALL_COLUMNS = [
-    { key: 'title',      label: 'Title',      get: (e) => (e.fields || {}).title || '(untitled)' },
-    { key: 'authors',    label: 'Authors',    get: (e) => (e.fields || {}).author || '' },
-    { key: 'year',       label: 'Year',       get: (e) => String((e.fields || {}).year || (e.fields || {}).date_range || '') },
-    { key: 'type',       label: 'Type',       get: (e) => e.type || '' },
-    { key: 'datasource', label: 'Datasource', get: (e) => (e.fields || {}).datasource || (e.datasource || '—') },
-    { key: 'saved',      label: 'Saved',      get: (e) => (e._dirty ? 'Local-only' : 'Synced') },
-  ];
+  // Phase 17 #8 / Phase 18 #2 — column registry. Each column is keyed by
+  // a BibTeX field `name` (or a virtual id like `saved` / `datasource`
+  // / `type` / `key`). The settings dialog and grid share a single
+  // source of truth (REGISTRY in src/views/settings.js); the resolver
+  // below maps a name to a getter, with a generic fallback that reads
+  // entry.fields[name] for any name not specially handled.
+  const SPECIAL_LABELS = {
+    title: 'Title',
+    author: 'Authors',
+    year: 'Year',
+    type: 'Entry type',
+    datasource: 'Datasource',
+    saved: 'Saved',
+    key: 'Citation key',
+    journal: 'Journal',
+    booktitle: 'Book title',
+    volume: 'Volume',
+    number: 'Number',
+    pages: 'Pages',
+    edition: 'Edition',
+    publisher: 'Publisher',
+    address: 'Address',
+    doi: 'DOI',
+    isbn: 'ISBN',
+    url: 'URL',
+    abstract: 'Abstract',
+    jel: 'JEL code',
+    lcc: 'LCC class',
+    note: 'Note',
+  };
+  function columnFor(name) {
+    let get;
+    switch (name) {
+      case 'title':      get = (e) => (e.fields || {}).title || '(untitled)'; break;
+      case 'author':     get = (e) => (e.fields || {}).author || ''; break;
+      case 'year':       get = (e) => String((e.fields || {}).year || (e.fields || {}).date_range || ''); break;
+      case 'type':       get = (e) => e.type || ''; break;
+      case 'datasource': get = (e) => (e.fields || {}).datasource || (e.datasource || '—'); break;
+      case 'saved':      get = (e) => (e._dirty ? 'Local-only' : 'Synced'); break;
+      case 'key':        get = (e) => e.key || ''; break;
+      default:           get = (e) => String((e.fields || {})[name] || ''); break;
+    }
+    const label = SPECIAL_LABELS[name] || (name.charAt(0).toUpperCase() + name.slice(1));
+    return { key: name, label, get };
+  }
+  // Default column set — mirrors REGISTRY's columnDefault flags. Kept
+  // in code rather than read from settings.js so the grid still works
+  // when settings.js isn't loaded (component tests, etc.).
+  const DEFAULT_COLUMN_NAMES = ['title', 'author', 'year', 'type', 'datasource', 'saved'];
+  const ALL_COLUMNS = DEFAULT_COLUMN_NAMES.map(columnFor);
   let COLUMNS = ALL_COLUMNS.slice();
   const ROW_HEIGHT = 56;
   const HEADER_ROW = -1;
@@ -584,8 +624,15 @@
       const visible = prefs.filter((p) => p.visible);
       const ordered = [];
       for (const p of visible) {
-        const def = ALL_COLUMNS.find((c) => c.key === p.key);
-        if (def) ordered.push(def);
+        // Phase 18 #2 — any registered name resolves to a column via
+        // columnFor(), including BibTeX field names (e.g., journal,
+        // pages) that weren't part of the original ALL_COLUMNS set.
+        // Legacy stored prefs may use `key` as the id; honour both.
+        const id = p.name || p.key;
+        if (!id) continue;
+        // Migrate legacy 'authors' id → 'author'.
+        const resolved = id === 'authors' ? 'author' : id;
+        ordered.push(columnFor(resolved));
       }
       // Always keep at least one column so the grid has something to render.
       COLUMNS = ordered.length ? ordered : [ALL_COLUMNS[0]];

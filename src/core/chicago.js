@@ -139,47 +139,71 @@
     // APA: 21+ authors — first 19, ellipsis, last.
     return formatted.slice(0, 19).join(', ') + ', ... ' + formatted[formatted.length - 1];
   }
+  // Phase 18 #7 / #8 — APA renderer rewrite.
+  // Strategy: build per-entry segments, drop empty ones, terminate each
+  // non-URL segment with a period, then join with single spaces. This
+  // eliminates the trailing ". ." artifacts that the previous template
+  // approach produced when an optional field (venue, publisher, etc.)
+  // was missing. The URL — DOI when available, else the entry's `url`
+  // field — is always emitted last when present (#7).
   function renderAPA(entry) {
     const f = entry.fields || {};
     const t = entry.type;
     const author = formatAuthorsAPA(f.author);
-    const year = f.year ? `(${f.year}).` : '(n.d.).';
-    const title = f.title || '';
-    const doi = f.doi ? ` https://doi.org/${f.doi}` : '';
+    const yearStr = f.year ? `(${f.year})` : '(n.d.)';
+    const title = (f.title || '').replace(/\.+$/, '');
+    const url = f.doi ? `https://doi.org/${f.doi}` : (f.url || '');
+
+    let segments;
     if (t === 'article') {
-      const journal = f.journal || '';
-      const volume = f.volume || '';
-      const number = f.number ? `(${f.number})` : '';
-      const pages = f.pages ? `, ${f.pages}` : '';
-      let venue = journal;
-      if (volume) venue += `, ${volume}${number}`;
-      venue += pages;
-      return `${author} ${year} ${title}. ${venue}.${doi}`.trim();
-    }
-    if (t === 'book' || t === 'inbook') {
-      const ed = f.edition ? ` (${f.edition} ed.)` : '';
-      const publisher = f.publisher || '';
-      return `${author} ${year} ${title}${ed}. ${publisher}.${doi}`.trim();
-    }
-    if (t === 'incollection' || t === 'inproceedings') {
+      const j = f.journal || '';
+      const v = f.volume || '';
+      const n = f.number ? `(${f.number})` : '';
+      const pg = f.pages || '';
+      let venue = j;
+      if (v) venue += `, ${v}${n}`;
+      else if (n) venue += n;
+      if (pg) venue += `, ${pg}`;
+      segments = [author, yearStr, title, venue, url];
+    } else if (t === 'book' || t === 'inbook') {
+      const ed = f.edition ? `(${f.edition} ed.)` : '';
+      const titleSeg = ed ? `${title} ${ed}` : title;
+      segments = [author, yearStr, titleSeg, f.publisher || '', url];
+    } else if (t === 'incollection' || t === 'inproceedings') {
       const editor = f.editor ? `${formatAuthorsAPA(f.editor)} (Eds.), ` : '';
-      const pages = f.pages ? ` (pp. ${f.pages})` : '';
-      const publisher = f.publisher || '';
-      return `${author} ${year} ${title}. In ${editor}${f.booktitle || ''}${pages}. ${publisher}.${doi}`.trim();
+      const bk = f.booktitle || '';
+      const pg = f.pages ? ` (pp. ${f.pages})` : '';
+      const inSeg = (bk || pg) ? `In ${editor}${bk}${pg}` : '';
+      segments = [author, yearStr, title, inSeg, f.publisher || '', url];
+    } else if (t === 'phdthesis' || t === 'mastersthesis') {
+      const kind = t === 'phdthesis' ? 'Doctoral dissertation' : "Master's thesis";
+      const titleSeg = title ? `${title} [${kind}]` : `[${kind}]`;
+      segments = [author, yearStr, titleSeg, f.school || '', url];
+    } else if (t === 'techreport' || t === 'working') {
+      const num = f.number ? `(${f.number})` : '';
+      const titleSeg = num ? `${title} ${num}` : title;
+      segments = [author, yearStr, titleSeg, f.institution || '', url];
+    } else if (t === 'archival') {
+      const item = f.item || title;
+      const loc = [f.collection, f.box ? `Box ${f.box}` : null, f.folder ? `Folder ${f.folder}` : null].filter(Boolean).join(', ');
+      segments = [author, yearStr, item, loc, f.repository || '', url];
+    } else {
+      segments = [author, yearStr, title, url];
     }
-    if (t === 'phdthesis' || t === 'mastersthesis') {
-      const kind = t === 'phdthesis' ? 'Doctoral dissertation' : 'Master\'s thesis';
-      return `${author} ${year} ${title} [${kind}]. ${f.school || ''}.${doi}`.trim();
-    }
-    if (t === 'techreport' || t === 'working') {
-      const num = f.number ? ` (${f.number})` : '';
-      return `${author} ${year} ${title}${num}. ${f.institution || ''}.${doi}`.trim();
-    }
-    if (t === 'archival') {
-      const repo = f.repository || '';
-      return `${author} ${year} ${f.item || title}. ${[f.collection, f.box ? `Box ${f.box}` : null, f.folder ? `Folder ${f.folder}` : null].filter(Boolean).join(', ')}. ${repo}.`.trim();
-    }
-    return `${author} ${year} ${title}.${doi}`.trim();
+
+    const out = [];
+    segments.forEach((s, i) => {
+      const txt = (s == null ? '' : String(s)).trim();
+      if (!txt) return;
+      const isLast = i === segments.length - 1;
+      const isUrl = isLast && /^https?:\/\//.test(txt);
+      if (isUrl) {
+        out.push(txt);
+      } else {
+        out.push(txt.replace(/\.+$/, '') + '.');
+      }
+    });
+    return out.join(' ');
   }
 
   globalThis.GitCiteChicago = { render, formatAuthors, renderAPA, formatAuthorsAPA };

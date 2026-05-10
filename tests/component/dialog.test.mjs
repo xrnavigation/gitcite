@@ -116,6 +116,40 @@ describe('Phase 1.D Dialog', () => {
     handle.close();
   });
 
+  it('Phase 18 #1 — every dialog renders a visible Close button with min 44x44 hit area', () => {
+    const handle = Dialog.open({ title: 'Close test', content: '<p>Body</p>' });
+    const close = document.querySelector('dialog [data-gitcite-dialog-close]');
+    expect(close).toBeTruthy();
+    expect(close.tagName).toBe('BUTTON');
+    expect(close.getAttribute('aria-label')).toMatch(/close/i);
+    // Inline style sets min-block-size + min-inline-size 44px.
+    expect(close.style.minBlockSize).toBe('44px');
+    expect(close.style.minInlineSize).toBe('44px');
+    handle.close();
+  });
+
+  it('Phase 18 #1 — clicking the Close button closes the dialog', () => {
+    Dialog.open({ title: 'Close test', content: '' });
+    const close = document.querySelector('dialog [data-gitcite-dialog-close]');
+    close.click();
+    expect(document.querySelector('dialog[data-gitcite-dialog]')).toBeNull();
+  });
+
+  it('Phase 18 #1 — alertdialog mode hides the Close button by default (explicit Cancel/Confirm flow)', () => {
+    const handle = Dialog.open({ title: 'Confirm', content: '', role: 'alertdialog' });
+    const close = document.querySelector('dialog [data-gitcite-dialog-close]');
+    expect(close).toBeNull();
+    handle.close();
+  });
+
+  it('Phase 18 #1 — close button is NOT the default initial focus', () => {
+    Dialog.open({
+      title: 'Initial focus',
+      content: '<button id="real-first">First action</button>',
+    });
+    expect(document.activeElement.id).toBe('real-first');
+  });
+
   it('multiple dialogs do not share a single instance — second open replaces or stacks predictably', () => {
     const a = Dialog.open({ title: 'A', content: '' });
     const b = Dialog.open({ title: 'B', content: '' });

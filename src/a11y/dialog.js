@@ -26,12 +26,37 @@
     dialog.setAttribute('aria-modal', 'true');
     dialog.setAttribute('role', role);
 
+    // Phase 18 #1 — header row contains the title heading and a real
+    // visible Close button. Every dialog gets one for free so users
+    // never have to hunt for an in-body Cancel / Close.
+    const headerBar = document.createElement('div');
+    headerBar.setAttribute('data-gitcite-dialog-header', '');
+    headerBar.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;';
+
     const titleId = nextId('gitcite-dialog-title');
     const heading = document.createElement('h2');
     heading.id = titleId;
     heading.textContent = opts.title || '';
-    dialog.appendChild(heading);
+    heading.style.cssText = 'margin:0;flex:1 1 auto;';
+    headerBar.appendChild(heading);
     dialog.setAttribute('aria-labelledby', titleId);
+
+    // alertdialog suppresses the close X — those flows have an explicit
+    // "Cancel" / "Confirm" button pair and dismissing via X would skip
+    // the user's deliberate choice. Caller can opt back in via showClose.
+    const showClose = (opts.showClose === true) || (role !== 'alertdialog');
+    let closeX = null;
+    if (showClose) {
+      closeX = document.createElement('button');
+      closeX.type = 'button';
+      closeX.setAttribute('data-gitcite-dialog-close', '');
+      closeX.setAttribute('aria-label', 'Close dialog');
+      closeX.textContent = '×'; // ×
+      closeX.style.cssText = 'min-block-size:44px;min-inline-size:44px;font-size:1.5rem;line-height:1;background:transparent;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--fg);';
+      closeX.addEventListener('click', () => close());
+      headerBar.appendChild(closeX);
+    }
+    dialog.appendChild(headerBar);
 
     if (opts.describedById) {
       dialog.setAttribute('aria-describedby', opts.describedById);
@@ -58,7 +83,10 @@
     }
     if (!firstFocus && globalThis.GitCiteFocus) {
       const items = globalThis.GitCiteFocus.getFocusable(dialog);
-      firstFocus = items[0];
+      // Phase 18 #1 — skip the close-X when picking the default initial
+      // focus. Sending screen-reader users straight to "Close dialog
+      // button" on every open would obscure the dialog's actual purpose.
+      firstFocus = items.find((n) => n !== closeX) || items[0];
     }
     if (firstFocus) firstFocus.focus();
 

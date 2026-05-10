@@ -57,3 +57,54 @@ describe('Chicago renderers', () => {
     expect(out).toMatch(/PhD diss\., MIT, 2024/);
   });
 });
+
+describe('APA renderer (Phase 18 #7 / #8)', () => {
+  const { render: renderAPA } = globalThis.GitCiteAPA;
+
+  it('inproceedings with no venue/editor/pages does NOT emit trailing ". ."', () => {
+    const e = {
+      type: 'inproceedings',
+      fields: { author: 'Biggs, Brandon and Yusim, Lena and Coppin, Peter', year: '2018', title: 'The Audio Game Laboratory: Building maps from games' },
+    };
+    const out = renderAPA(e);
+    expect(out).toBe('Biggs, B., Yusim, L., & Coppin, P. (2018). The Audio Game Laboratory: Building maps from games.');
+    expect(out).not.toMatch(/\.\s+\./); // no ". ." anywhere
+    expect(out).not.toMatch(/\s\./);    // no " ." (space before period)
+  });
+
+  it('article with empty journal/volume/pages still produces a clean ending', () => {
+    const e = { type: 'article', fields: { author: 'Smith, A.', year: '2020', title: 'Cities' } };
+    const out = renderAPA(e);
+    expect(out).toBe('Smith, A. (2020). Cities.');
+  });
+
+  it('always shows DOI as a https URL when present', () => {
+    const e = { type: 'article', fields: { author: 'Smith, A.', year: '2020', title: 'Cities', doi: '10.1/abc' } };
+    expect(renderAPA(e)).toMatch(/https:\/\/doi\.org\/10\.1\/abc$/);
+  });
+
+  it('always shows the URL field when no DOI is present', () => {
+    const e = { type: 'misc', fields: { author: 'Smith, A.', year: '2020', title: 'Cities', url: 'https://example.com/x' } };
+    expect(renderAPA(e)).toMatch(/https:\/\/example\.com\/x$/);
+  });
+
+  it('does NOT terminate the URL with a period (URLs are bare)', () => {
+    const e = { type: 'article', fields: { author: 'Smith, A.', year: '2020', title: 'Cities', doi: '10.1/abc' } };
+    expect(renderAPA(e)).not.toMatch(/\.$/);
+  });
+
+  it('strips trailing periods on incoming title to avoid ".. "', () => {
+    const e = { type: 'article', fields: { author: 'Smith, A.', year: '2020', title: 'Cities.' } };
+    expect(renderAPA(e)).toBe('Smith, A. (2020). Cities.');
+  });
+
+  it('book with no publisher / no edition: no trailing empty period', () => {
+    const e = { type: 'book', fields: { author: 'Smith, A.', year: '2020', title: 'Cities' } };
+    expect(renderAPA(e)).toBe('Smith, A. (2020). Cities.');
+  });
+
+  it('book with edition + publisher emits both, period-clean', () => {
+    const e = { type: 'book', fields: { author: 'Smith, A.', year: '2020', title: 'Cities', edition: '2nd', publisher: 'MIT Press' } };
+    expect(renderAPA(e)).toBe('Smith, A. (2020). Cities (2nd ed.). MIT Press.');
+  });
+});

@@ -583,54 +583,32 @@
       });
       mountSidebarActions(nav);
     }
-    if (aside) {
-      aside.hidden = false;
-      globalThis.GitCiteDetail.mount(aside, {
-        onEdit: (e) => { Toast.show({ message: `Edit form for ${e.key} (Phase 5)` }); },
-        onDuplicate: (e) => { Toast.show({ message: `Duplicate ${e.key} (Phase 5)` }); },
-        onDelete: (e) => {
-          model.mutate(e, 'delete');
-          refreshPill();
-          refreshList();
-        },
-        // Phase 13 Edit 4 — undo callback wired to the toast Undo button.
-        onRestore: (e) => {
-          // Re-add via mutate('add') after delete; clears the deleted set.
-          try {
-            model.mutate(e, 'add');
-          } catch (_) {
-            // If the key already exists (rare race), treat as a no-op.
-          }
-          refreshPill();
-          refreshList();
-          if (Announce) Announce.polite(`Restored ${e.key}`);
-        },
-      });
-    }
+    // Phase 18 #5 — detail view moved into a dialog. The aside (the
+    // narrow column to the right of the table) used to host the detail
+    // panel, but the user found the split view confusing — selecting a
+    // row pushed information below the fold and made keyboard navigation
+    // less predictable. Now Enter on a row opens a modal dialog with the
+    // same content, and Escape / Close returns to the table cell that
+    // opened it. Detail.mount is deferred to onActivate (below) where we
+    // mount it into the dialog body fresh per open.
+    if (aside) aside.hidden = true;
 
     globalThis.GitCiteSearchBar.mount(searchSlot, {
       onChange: (q) => { _criteria = { ..._criteria, query: q }; refreshList(); },
     });
 
-    // Phase 17 #16/#17 — Enter on a row goes directly to the detail
-    // view in the aside (was: open the row-action menu dialog with an
-    // "Open detail" button). Edit / Duplicate / Delete affordances
-    // already live in detail.js, so the menu dialog was duplicating UI
-    // the user had to click through. Focus moves to the title H2 of the
-    // detail view; aside is unhidden if it was hidden.
+    // Phase 18 #5 — Enter on a row opens the detail content in a dialog
+    // (was: aside panel below the table). The dialog title is the entry
+    // title; the body hosts the same Detail.show output. Escape / Close
+    // returns focus to the originating grid cell automatically (handled
+    // by the dialog primitive's restoreFocusTo opener).
     if (globalThis.GitCiteGrid) {
       globalThis.GitCiteGrid.mount(listSlot, {
-        onActivate: (entry) => {
-          if (aside) aside.hidden = false;
-          globalThis.GitCiteDetail.show(entry);
-          // Defer focus to next tick so the new H2 is in the DOM and
-          // any aside-unhide reflow has completed.
-          setTimeout(() => { try { globalThis.GitCiteDetail.focus(); } catch (_) {} }, 0);
-        },
+        onActivate: (entry) => openDetailDialog(entry),
       });
     } else if (globalThis.GitCiteList) {
       globalThis.GitCiteList.mount(listSlot, {
-        onSelect: (e) => globalThis.GitCiteDetail.show(e),
+        onSelect: (e) => openDetailDialog(e),
       });
     }
 
@@ -654,6 +632,39 @@
     }
   }
   // Exposed below on GitCiteApp so settings.js can call back into us.
+
+  // Phase 18 #5 — open the citation detail in a dialog. Mount Detail
+  // into the dialog body, hand it the entry, and wire the Edit /
+  // Delete / Restore handlers used by the previous aside-based flow.
+  // The dialog primitive already restores focus to the opener (the grid
+  // cell that triggered onActivate), so Escape / Close returns the user
+  // to where they were without manual focus management.
+  function openDetailDialog(entry) {
+    if (!globalThis.GitCiteDialog || !globalThis.GitCiteDetail) return;
+    const handle = globalThis.GitCiteDialog.open({
+      title: (entry.fields && entry.fields.title) || entry.key || 'Citation',
+    });
+    const body = handle.dialog.querySelector('.gitcite-dialog-body');
+    globalThis.GitCiteDetail.mount(body, {
+      inDialog: true,
+      onEdit: (e) => { Toast.show({ message: `Edit form for ${e.key} (Phase 5)` }); },
+      onDuplicate: (e) => { Toast.show({ message: `Duplicate ${e.key} (Phase 5)` }); },
+      onDelete: (e) => {
+        model.mutate(e, 'delete');
+        refreshPill();
+        refreshList();
+        try { handle.close(); } catch (_) {}
+      },
+      onRestore: (e) => {
+        try { model.mutate(e, 'add'); } catch (_) {}
+        refreshPill();
+        refreshList();
+        if (Announce) Announce.polite(`Restored ${e.key}`);
+      },
+    });
+    globalThis.GitCiteDetail.show(entry);
+    setTimeout(() => { try { globalThis.GitCiteDetail.focus(); } catch (_) {} }, 0);
+  }
 
   function rowActionHandlers() {
     return {

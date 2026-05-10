@@ -27,20 +27,33 @@
     const f = entry.fields || {};
     const titleId = (globalThis.GitCiteIds || { next: () => 'dt' }).next('detail-title');
 
-    const title = document.createElement('h2');
-    title.id = titleId;
-    title.textContent = f.title || '(untitled)';
-    // Phase 17 #16/#17 — H2 is the focus target when Enter activates a
-    // grid row. tabindex=-1 lets us programmatically focus it without
-    // putting it in the tab order.
-    title.setAttribute('tabindex', '-1');
-    _host.appendChild(title);
-    _host.setAttribute('aria-labelledby', titleId);
+    // Phase 18 #5 — when mounted inside a dialog the dialog primitive
+    // already supplies a labelled <h2> at the top, so we skip the
+    // duplicate title here and use the dialog's heading as the focus
+    // target. _opts.inDialog is set by the dialog opener.
+    let title;
+    if (_opts && _opts.inDialog) {
+      const dlg = _host.closest('dialog');
+      title = dlg && dlg.querySelector('h2');
+      if (title) {
+        try { title.setAttribute('tabindex', '-1'); } catch (_) {}
+      }
+    } else {
+      title = document.createElement('h2');
+      title.id = titleId;
+      title.textContent = f.title || '(untitled)';
+      // tabindex=-1 lets us programmatically focus the heading without
+      // putting it in the tab order.
+      title.setAttribute('tabindex', '-1');
+      title.style.cssText = 'margin:0 0 0.5rem;';
+      _host.appendChild(title);
+      _host.setAttribute('aria-labelledby', titleId);
+    }
 
     // Phase 17 #15 — APA citation is the default visible citation block
     // (Chicago lives in a disclosure further down for users who want it).
-    // Includes a Copy button that copies the rendered APA text to the
-    // clipboard and announces "APA citation copied".
+    // Phase 18 #6 — meta line ("Author · Year · type") removed; the APA
+    // text already covers author/year/title and is more useful.
     const apaWrap = document.createElement('section');
     apaWrap.setAttribute('aria-label', 'APA citation');
     apaWrap.style.cssText = 'margin-block:0.5rem;padding:0.5rem;background:var(--bg-elevated);border-radius:4px;';
@@ -61,9 +74,6 @@
         await navigator.clipboard.writeText(apaText.textContent);
         if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('APA citation copied');
       } catch (_) {
-        // Phase 17 a11y-review m4 — fall back when clipboard API is
-        // unavailable or refused (insecure context, missing permission).
-        // Select the text so the user can Ctrl+C manually, and tell them.
         try {
           const r = document.createRange();
           r.selectNodeContents(apaText);
@@ -77,9 +87,42 @@
     apaWrap.appendChild(apaCopy);
     _host.appendChild(apaWrap);
 
-    const meta = document.createElement('p');
-    meta.textContent = `${f.author || '—'} · ${f.year || f.date_range || '—'} · ${entry.type}`;
-    _host.appendChild(meta);
+    // Phase 18 #6 — citation key block: shows the key + Copy key button.
+    // Replaces the old "Author · Year · type" meta line.
+    const keyWrap = document.createElement('p');
+    keyWrap.setAttribute('data-detail-key', '');
+    keyWrap.style.cssText = 'margin:0.5rem 0;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;';
+    const keyLabel = document.createElement('span');
+    keyLabel.textContent = 'Key: ';
+    const keyValue = document.createElement('code');
+    keyValue.setAttribute('data-detail-key-value', '');
+    keyValue.textContent = entry.key || '';
+    keyValue.style.cssText = 'background:var(--bg-elevated);padding:0.125rem 0.375rem;border-radius:3px;';
+    const keyCopy = document.createElement('button');
+    keyCopy.type = 'button';
+    keyCopy.setAttribute('data-copy-key', '');
+    keyCopy.textContent = 'Copy key';
+    keyCopy.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    keyCopy.addEventListener('click', async () => {
+      const text = entry.key || '';
+      try {
+        await navigator.clipboard.writeText(text);
+        if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite(`Citation key ${text} copied`);
+      } catch (_) {
+        try {
+          const r = document.createRange();
+          r.selectNodeContents(keyValue);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+        } catch (_) {}
+        if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('Could not copy automatically. Key is selected — press Ctrl+C to copy.');
+      }
+    });
+    keyWrap.appendChild(keyLabel);
+    keyWrap.appendChild(keyValue);
+    keyWrap.appendChild(keyCopy);
+    _host.appendChild(keyWrap);
 
     if (f.doi) {
       const p = document.createElement('p');
@@ -97,7 +140,7 @@
       _host.appendChild(p);
     }
 
-    _host.appendChild(disclosure('Raw BibTeX', renderRaw(entry)));
+    _host.appendChild(disclosure('BibTeX', renderRaw(entry)));
     _host.appendChild(disclosure('Chicago Notes-Bibliography Citation', renderChicago(entry)));
 
     const actions = document.createElement('div');
@@ -263,7 +306,15 @@
 
   function focus() {
     if (!_host) return false;
-    const h = _host.querySelector('h2');
+    // Phase 18 #5 — when mounted inside a dialog, the dialog's <h2> is
+    // outside _host. Look up the closest dialog's h2 first; fall back to
+    // the host's own h2 for the legacy aside-mounted path.
+    let h = null;
+    if (_opts && _opts.inDialog) {
+      const dlg = _host.closest('dialog');
+      if (dlg) h = dlg.querySelector('h2');
+    }
+    if (!h) h = _host.querySelector('h2');
     if (!h) return false;
     try { h.focus(); } catch (_) {}
     return true;

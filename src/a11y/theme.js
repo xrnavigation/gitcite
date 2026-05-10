@@ -44,15 +44,12 @@
   }
 
   function mountToggle() {
-    const slot = document.querySelector('[data-theme-toggle-slot]');
-    if (!slot) return;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'theme-toggle';
-    btn.dataset.themeToggle = '';
-    btn.addEventListener('click', toggleTheme);
-    slot.appendChild(btn);
-    updateButton(currentTheme());
+    // Phase 18 #4 — header theme toggle removed. The theme is now chosen
+    // exclusively from Settings → Theme, so we no longer mount a header
+    // button. The `apply` / `persist` / `read` API stays public for the
+    // pre-paint bootstrap and the settings dialog. If any deployment
+    // wants to re-add a header button, they can render it themselves and
+    // call GitCiteTheme.toggle().
   }
 
   // Public API for tests and later phases.

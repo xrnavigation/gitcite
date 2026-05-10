@@ -32,37 +32,46 @@
     fields: 'gitcite.settings.defaultFields',  // JSON: [{name, visible}]
   };
 
-  // Defaults match the current grid / edit-form defaults so a first-run
-  // user sees the existing UI exactly.
-  const DEFAULT_COLUMNS = [
-    { key: 'title',      label: 'Title',      visible: true },
-    { key: 'authors',    label: 'Authors',    visible: true },
-    { key: 'year',       label: 'Year',       visible: true },
-    { key: 'type',       label: 'Type',       visible: true },
-    { key: 'datasource', label: 'Datasource', visible: true },
-    { key: 'saved',      label: 'Saved',      visible: true },
+  // Phase 18 #2 — single shared registry of citation-related items.
+  // Library columns AND Default add-citation fields both pick from this
+  // list, so adding/removing an item in one place naturally exposes it
+  // in the other. Each item has independent default visibility for
+  // each surface (`columnDefault` / `fieldDefault`) plus an optional
+  // `field` flag — when false, the item is column-only (e.g., the
+  // virtual "saved" status, which has no underlying BibTeX field).
+  // NB: the reorderable list keys on `name`, so all entries must share
+  // that property name.
+  const REGISTRY = [
+    { name: 'key',        label: 'Citation key', columnDefault: false, fieldDefault: true,  field: true },
+    { name: 'type',       label: 'Entry type',   columnDefault: true,  fieldDefault: false, field: false },
+    { name: 'title',      label: 'Title',        columnDefault: true,  fieldDefault: true,  field: true },
+    { name: 'author',     label: 'Authors',      columnDefault: true,  fieldDefault: true,  field: true },
+    { name: 'year',       label: 'Year',         columnDefault: true,  fieldDefault: true,  field: true },
+    { name: 'journal',    label: 'Journal',      columnDefault: false, fieldDefault: true,  field: true },
+    { name: 'booktitle',  label: 'Book title',   columnDefault: false, fieldDefault: false, field: true },
+    { name: 'volume',     label: 'Volume',       columnDefault: false, fieldDefault: false, field: true },
+    { name: 'number',     label: 'Number',       columnDefault: false, fieldDefault: false, field: true },
+    { name: 'pages',      label: 'Pages',        columnDefault: false, fieldDefault: false, field: true },
+    { name: 'edition',    label: 'Edition',      columnDefault: false, fieldDefault: false, field: true },
+    { name: 'publisher',  label: 'Publisher',    columnDefault: false, fieldDefault: false, field: true },
+    { name: 'address',    label: 'Address',      columnDefault: false, fieldDefault: false, field: true },
+    { name: 'doi',        label: 'DOI',          columnDefault: false, fieldDefault: true,  field: true },
+    { name: 'isbn',       label: 'ISBN',         columnDefault: false, fieldDefault: false, field: true },
+    { name: 'url',        label: 'URL',          columnDefault: false, fieldDefault: false, field: true },
+    { name: 'abstract',   label: 'Abstract',     columnDefault: false, fieldDefault: false, field: true },
+    { name: 'jel',        label: 'JEL code',     columnDefault: false, fieldDefault: false, field: true },
+    { name: 'lcc',        label: 'LCC class',    columnDefault: false, fieldDefault: false, field: true },
+    { name: 'note',       label: 'Note',         columnDefault: false, fieldDefault: false, field: true },
+    { name: 'datasource', label: 'Datasource',   columnDefault: true,  fieldDefault: false, field: false },
+    { name: 'saved',      label: 'Saved',        columnDefault: true,  fieldDefault: false, field: false },
   ];
-  const DEFAULT_FIELDS = [
-    { name: 'key',       label: 'Citation key', visible: true },
-    { name: 'title',     label: 'Title',        visible: true },
-    { name: 'author',    label: 'Author(s)',    visible: true },
-    { name: 'year',      label: 'Year',         visible: true },
-    { name: 'journal',   label: 'Journal',      visible: true },
-    { name: 'booktitle', label: 'Book title',   visible: false },
-    { name: 'volume',    label: 'Volume',       visible: false },
-    { name: 'number',    label: 'Number',       visible: false },
-    { name: 'pages',     label: 'Pages',        visible: false },
-    { name: 'edition',   label: 'Edition',      visible: false },
-    { name: 'publisher', label: 'Publisher',    visible: false },
-    { name: 'address',   label: 'Address',      visible: false },
-    { name: 'doi',       label: 'DOI',          visible: true },
-    { name: 'isbn',      label: 'ISBN',         visible: false },
-    { name: 'url',       label: 'URL',          visible: false },
-    { name: 'abstract',  label: 'Abstract',     visible: false },
-    { name: 'jel',       label: 'JEL code',     visible: false },
-    { name: 'lcc',       label: 'LCC class',    visible: false },
-    { name: 'note',      label: 'Note',         visible: false },
-  ];
+
+  // Build per-surface defaults from REGISTRY. Both surfaces use `name`
+  // as the row id (was `key`/`name` split before Phase 18).
+  const DEFAULT_COLUMNS = REGISTRY.map((r) => ({ name: r.name, label: r.label, visible: r.columnDefault }));
+  const DEFAULT_FIELDS = REGISTRY
+    .filter((r) => r.field)
+    .map((r) => ({ name: r.name, label: r.label, visible: r.fieldDefault }));
 
   function readJSON(key, fallback) {
     try {
@@ -97,7 +106,15 @@
   function getColumns() {
     const stored = readJSON(STORAGE.columns, null);
     if (!stored) return DEFAULT_COLUMNS.slice();
-    return mergePrefs(stored, DEFAULT_COLUMNS, 'key');
+    // Phase 18 #2 — migrate legacy stored entries that used `key` as
+    // the id to the unified `name` field. Older preferences also used
+    // `authors` as the columns id; map it back to `author`.
+    const migrated = stored.map((s) => {
+      const id = s.name || s.key;
+      const remap = id === 'authors' ? 'author' : id;
+      return { name: remap, visible: !!s.visible };
+    });
+    return mergePrefs(migrated, DEFAULT_COLUMNS, 'name');
   }
   function setColumns(cols) { writeJSON(STORAGE.columns, cols); }
   function getFields() {
@@ -207,13 +224,13 @@
           }
         });
         cbLabel.appendChild(cb);
-        cbLabel.appendChild(document.createTextNode(' Show'));
+        // Phase 18 #3 — checkbox label includes the item name so each
+        // toggle has a unique accessible name. The previous "Show" was
+        // identical for every row (WCAG 2.5.3 / 4.1.2 violation: a list
+        // of "Show / Show / Show" checkboxes can't be distinguished by
+        // screen-reader users navigating by form-control list).
+        cbLabel.appendChild(document.createTextNode(` Show ${item.label}`));
         row.appendChild(cbLabel);
-
-        const text = document.createElement('span');
-        text.textContent = item.label;
-        text.style.cssText = 'flex:1 1 8rem;';
-        row.appendChild(text);
 
         // Up / Down buttons (the always-available keyboard substitute).
         const up = document.createElement('button');
@@ -402,11 +419,11 @@
     help.textContent = 'Pick which columns appear in the library table and the order they appear in.';
     sec.appendChild(help);
 
-    const list = reorderableList(getColumns().map((c) => ({ id: c.key, label: c.label, visible: c.visible })), {
+    const list = reorderableList(getColumns().map((c) => ({ id: c.name, label: c.label, visible: c.visible })), {
       ariaLabel: 'Library columns',
       describedBy: 'settings-cols-help',
       onChange: (state) => {
-        const persisted = state.map((s) => ({ key: s.id, label: s.label, visible: s.visible }));
+        const persisted = state.map((s) => ({ name: s.id, label: s.label, visible: s.visible }));
         setColumns(persisted);
         // Live re-render so the user sees their change immediately.
         if (globalThis.GitCiteApp && globalThis.GitCiteApp.applyColumnPrefs) {

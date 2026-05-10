@@ -70,10 +70,12 @@ describe('Phase 17 #8 — Settings dialog', () => {
     globalThis.GitCiteSettings.open();
     const list = document.querySelector('dialog [role="list"][aria-label="Library columns"]');
     const firstDown = list.querySelector('[data-pos="0"] [data-move-down]');
+    const firstName = list.querySelector('[data-pos="0"]').getAttribute('data-item-id');
+    const secondName = list.querySelector('[data-pos="1"]').getAttribute('data-item-id');
     firstDown.click();
     const stored = JSON.parse(localStorage.getItem('gitcite.settings.columns'));
-    expect(stored[0].key).toBe('authors'); // was 'title'
-    expect(stored[1].key).toBe('title');
+    expect(stored[0].name).toBe(secondName);
+    expect(stored[1].name).toBe(firstName);
   });
 
   it('toggling the visibility checkbox persists visible:false', () => {
@@ -95,6 +97,43 @@ describe('Phase 17 #8 — Settings dialog', () => {
     firstCb.dispatchEvent(new Event('change', { bubbles: true }));
     const stored = JSON.parse(localStorage.getItem('gitcite.settings.defaultFields'));
     expect(stored[0].visible).toBe(false);
+  });
+
+  it('Phase 18 #2 — Library columns include every BibTeX field that Default fields offer', () => {
+    globalThis.GitCiteSettings.open();
+    const cols = document.querySelectorAll('dialog [role="list"][aria-label="Library columns"] [role="listitem"]');
+    const fields = document.querySelectorAll('dialog [role="list"][aria-label="Default add-citation fields"] [role="listitem"]');
+    const colNames = new Set(Array.from(cols).map((r) => r.getAttribute('data-item-id')));
+    const fieldNames = Array.from(fields).map((r) => r.getAttribute('data-item-id'));
+    // Every Default field must appear as a Library-columns option.
+    for (const n of fieldNames) {
+      expect(colNames.has(n)).toBe(true);
+    }
+  });
+
+  it('Phase 18 #2 — toggling a column on/off triggers applyColumnPrefs (table updates)', () => {
+    const apply = vi.fn();
+    globalThis.GitCiteApp = { applyColumnPrefs: apply };
+    globalThis.GitCiteSettings.open();
+    const list = document.querySelector('dialog [role="list"][aria-label="Library columns"]');
+    const cb = list.querySelector('[data-pos="0"] [data-vis-toggle]');
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(apply).toHaveBeenCalled();
+  });
+
+  it('Phase 18 #3 — visibility checkbox label includes the item name (unique accessible name per row)', () => {
+    globalThis.GitCiteSettings.open();
+    const list = document.querySelector('dialog [role="list"][aria-label="Library columns"]');
+    const labels = Array.from(list.querySelectorAll('label')).map((l) => l.textContent.trim());
+    expect(labels.length).toBeGreaterThan(2);
+    // No two checkbox labels should share the same accessible text.
+    const unique = new Set(labels);
+    expect(unique.size).toBe(labels.length);
+    // Every label should follow the "Show <Name>" pattern.
+    for (const t of labels) {
+      expect(t).toMatch(/^Show\s+\S/);
+    }
   });
 
   it('grab toggle flips aria-pressed and announces', () => {
