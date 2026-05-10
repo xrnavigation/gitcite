@@ -81,12 +81,29 @@
       if (!b) return;
       b.disabled = !enabled;
     }
-    host._gitciteToolbar = { setEnabled };
+    // Phase 17 #10 — mark the toolbar entry that maps to the active
+    // view with aria-current="page". One button at a time; passing null
+    // clears the marker. CSS [aria-current="page"] in tokens.css gives
+    // it the visible-active styling.
+    function setActive(id) {
+      const all = tb.querySelectorAll('[data-toolbar-item]');
+      all.forEach((b) => {
+        if (b.getAttribute('data-toolbar-item') === id) {
+          b.setAttribute('aria-current', 'page');
+        } else {
+          b.removeAttribute('aria-current');
+        }
+      });
+    }
+    host._gitciteToolbar = { setEnabled, setActive };
   }
 
   function setEnabled(host, id, enabled) {
     if (host && host._gitciteToolbar) host._gitciteToolbar.setEnabled(id, enabled);
   }
+  function setActive(host, id) {
+    if (host && host._gitciteToolbar) host._gitciteToolbar.setActive(id);
+  }
 
-  globalThis.GitCiteHeaderToolbar = { mount, setEnabled };
+  globalThis.GitCiteHeaderToolbar = { mount, setEnabled, setActive };
 })();

@@ -8,12 +8,29 @@
 
   if (globalThis.GitCiteInsights) return;
 
+  // Phase 17 #11 — store the active dialog handle + filter callback so
+  // bar buttons can close the modal and apply a filter to the library.
+  let _activeHandle = null;
+  let _onApplyFilter = null;
+
   function open(entries, opts) {
     opts = opts || {};
     const Dialog = globalThis.GitCiteDialog;
     const handle = Dialog.open({ title: 'Insights', content: '' });
+    _activeHandle = handle;
+    _onApplyFilter = typeof opts.onApplyFilter === 'function' ? opts.onApplyFilter : null;
     const body = handle.dialog.querySelector('.gitcite-dialog-body');
     body.appendChild(renderTabs(entries));
+  }
+
+  function applyFilterAndClose(patch, label) {
+    if (_onApplyFilter) {
+      try { _onApplyFilter(patch, label); } catch (_) {}
+    }
+    if (_activeHandle) {
+      try { _activeHandle.close(); } catch (_) {}
+    }
+    _activeHandle = null;
   }
 
   function renderTabs(entries) {
@@ -81,10 +98,16 @@
     return p;
   }
 
-  function bar({ label, value, percent }) {
+  function bar({ label, value, percent, filter, filterLabel }) {
     const item = document.createElement('button');
     item.type = 'button';
-    item.setAttribute('aria-label', `${label}: ${value} (${percent}%)`);
+    // Phase 17 #11 — when a filter spec is supplied, the button's label
+    // says what activating it will do ("Filter library by …") so screen
+    // readers convey the affordance, not just the data.
+    const aLabel = filter
+      ? `Filter library by ${filterLabel || label} — ${value} ${value === 1 ? 'entry' : 'entries'} (${percent}%)`
+      : `${label}: ${value} (${percent}%)`;
+    item.setAttribute('aria-label', aLabel);
     item.style.cssText = 'display:block;width:100%;text-align:left;background:none;color:var(--fg);border:1px solid transparent;padding:0.25rem 0.5rem;min-block-size:44px;cursor:pointer;';
     item.addEventListener('focus', () => { item.style.outline = '2px solid var(--focus-ring)'; });
     item.addEventListener('blur', () => { item.style.outline = ''; });
@@ -95,6 +118,9 @@
     fill.style.cssText = `height:8px;background:var(--accent);width:${Math.max(2, percent)}%;margin-block-start:0.25rem;`;
     fill.setAttribute('aria-hidden', 'true');
     item.appendChild(fill);
+    if (filter) {
+      item.addEventListener('click', () => applyFilterAndClose(filter, filterLabel || label));
+    }
     return item;
   }
 
@@ -117,7 +143,11 @@
     const max = Math.max(...counts.values());
     wrap.appendChild(caption(`Publication years range from ${Math.min(...years)} to ${Math.max(...years)}; the most common year accounts for ${pct(max, years.length)}% of entries.`));
     const sorted = Array.from(counts.entries()).sort((a, b) => a[0] - b[0]);
-    for (const [y, c] of sorted) wrap.appendChild(bar({ label: String(y), value: c, percent: pct(c, years.length) }));
+    for (const [y, c] of sorted) wrap.appendChild(bar({
+      label: String(y), value: c, percent: pct(c, years.length),
+      filter: { yearFrom: y, yearTo: y },
+      filterLabel: `year ${y}`,
+    }));
     return wrap;
   }
 
@@ -131,7 +161,11 @@
     const total = entries.length;
     wrap.appendChild(caption(`${counts.size} unique authors across ${total} entries.`));
     const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20);
-    for (const [a, c] of top) wrap.appendChild(bar({ label: a, value: c, percent: pct(c, total) }));
+    for (const [a, c] of top) wrap.appendChild(bar({
+      label: a, value: c, percent: pct(c, total),
+      filter: { query: a },
+      filterLabel: `author "${a}"`,
+    }));
     return wrap;
   }
 
@@ -144,7 +178,11 @@
     }
     wrap.appendChild(caption(`${counts.size} unique venues; ${pct(Array.from(counts.values()).reduce((a, b) => a + b, 0), entries.length)}% of entries record a venue.`));
     const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20);
-    for (const [v, c] of top) wrap.appendChild(bar({ label: v, value: c, percent: pct(c, entries.length) }));
+    for (const [v, c] of top) wrap.appendChild(bar({
+      label: v, value: c, percent: pct(c, entries.length),
+      filter: { query: v },
+      filterLabel: `venue "${v}"`,
+    }));
     return wrap;
   }
 
@@ -153,7 +191,11 @@
     const F = globalThis.GitCiteFilter;
     const items = F ? F.listJEL(entries) : [];
     wrap.appendChild(caption(`${items.length} unique JEL codes used across the library.`));
-    items.slice(0, 20).forEach((it) => wrap.appendChild(bar({ label: it.value, value: it.count, percent: pct(it.count, entries.length) })));
+    items.slice(0, 20).forEach((it) => wrap.appendChild(bar({
+      label: it.value, value: it.count, percent: pct(it.count, entries.length),
+      filter: { jel: it.value },
+      filterLabel: `JEL ${it.value}`,
+    })));
     return wrap;
   }
 

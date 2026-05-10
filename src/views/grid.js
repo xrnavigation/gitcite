@@ -377,6 +377,39 @@
   function onKeydown(e) {
     const key = e.key;
     const ctrl = e.ctrlKey || e.metaKey;
+    // Phase 17 #9 — Ctrl+C on a focused cell copies the cell's text to
+    // the clipboard and announces "<column header> copied". The grid is
+    // role=grid (not a real text editor) so the browser's default Ctrl+C
+    // would copy the empty selection inside the cell. We override that
+    // and intentionally do not preventDefault when the user has an
+    // actual text selection inside an editable element (defensive — no
+    // editable cells exist today, but the guard keeps future edit-in-
+    // place from regressing).
+    if (ctrl && (key === 'c' || key === 'C')) {
+      const sel = (typeof window !== 'undefined' && window.getSelection)
+        ? window.getSelection().toString()
+        : '';
+      if (sel && sel.length > 0) return; // honour the user's existing selection
+      const ae = document.activeElement;
+      if (ae && ae.getAttribute && ae.getAttribute('role') === 'gridcell') {
+        e.preventDefault();
+        const text = ae.textContent || '';
+        const colIdx = Number(ae.getAttribute('data-col'));
+        const colLabel = (COLUMNS[colIdx] || {}).label || 'Cell';
+        // Best-effort clipboard write. Browsers without async clipboard
+        // (very old) fall through silently — the announcement still fires
+        // so the user knows the keystroke was received.
+        try {
+          if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text);
+          }
+        } catch (_) {}
+        if (globalThis.GitCiteAnnounce) {
+          globalThis.GitCiteAnnounce.polite(`${colLabel} copied`);
+        }
+        return;
+      }
+    }
     // Phase 14 A.3/A.4 — Ctrl+arrow aliases. Tested before plain arrows
     // because plain ArrowUp/Down handlers must not swallow the ctrl
     // variant.

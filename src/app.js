@@ -30,6 +30,17 @@
     if (typeof document !== 'undefined') document.title = next;
   }
 
+  // Phase 17 #10 — mark the toolbar entry corresponding to the active
+  // view with aria-current="page". Centralises the mapping so each view
+  // function can call setActiveView('library') / 'add-citation' /
+  // 'reload-library' once per render.
+  function setActiveView(toolbarId) {
+    const tbHost = document.querySelector('[data-toolbar-host]');
+    if (tbHost && globalThis.GitCiteHeaderToolbar && globalThis.GitCiteHeaderToolbar.setActive) {
+      globalThis.GitCiteHeaderToolbar.setActive(tbHost, toolbarId);
+    }
+  }
+
   // Phase 16 #10 — when the loader region (landing) was previously mounted
   // into <main>, it stamped role="region" aria-label="Library import" onto
   // the host. That label persists across innerHTML replacement; without
@@ -286,6 +297,7 @@
     if (nav) nav.hidden = true;
     if (aside) aside.hidden = true;
     setViewTitle('Open library');
+    setActiveView('reload-library');
     Landing.mount(main, {
       onOpen: async (r) => {
         // Phase 16 #13 — live-linked file open. The opened file is the
@@ -310,6 +322,7 @@
     if (!main) return;
     main.innerHTML = '';
     setViewTitle('Empty library');
+    setActiveView('library');
 
     const region = document.createElement('section');
     region.setAttribute('aria-labelledby', 'empty-library-heading');
@@ -441,6 +454,7 @@
     const wrap = document.createElement('div');
     main.innerHTML = '';
     setViewTitle('Add citation');
+    setActiveView('add-citation');
 
     const back = document.createElement('button');
     back.type = 'button';
@@ -527,6 +541,7 @@
 
     main.innerHTML = '';
     setViewTitle('Library');
+    setActiveView('library');
 
     // Phase 14 B.2 / a11y-review (Critical 2) — every view's first
     // heading inside <main> is an H1. Uses the "focusable visually
