@@ -28,7 +28,7 @@ and it works.
 - Reorderable library columns and Default-add fields, configurable from a
   single Settings dialog.
 
-## Three ways to use GitCite
+## Four ways to use GitCite
 
 ### 1. Open the hosted version
 
@@ -89,6 +89,91 @@ If you'd rather not use GitHub Actions, choose **Source = Deploy from a
 branch**, branch `main`, folder `/` — and rename `dist/` to `docs/` (or
 serve from root) since GitHub's branch-deploy only allows `/` or `/docs`
 as the publish folder.
+
+### 4. Drop into your existing `.bib` repo (recommended for personal libraries)
+
+Use this when you already have a public repository that holds your
+citations and you want a hosted GitCite that loads and saves *that
+specific file*. Worked example: a repo `brandon/brandon_bib` with
+`citations.bib` at the root.
+
+**Step 1 — Drop the file in.** Download
+[gitcite.html v1.0.0](https://github.com/xrnavigation/gitcite/releases/download/v1.0.0/gitcite.html),
+rename it to `index.html`, and commit it to the **root** of `brandon_bib`.
+The repo now looks like:
+
+```
+brandon_bib/
+├── index.html       ← the GitCite app
+└── citations.bib    ← your library
+```
+
+**Step 2 — Configure for your repo.** Open `index.html` in a text editor
+and find the `GITCITE_CONFIG` block (search for `const GITCITE_CONFIG`,
+near the top of the file). Edit these keys:
+
+```js
+const GITCITE_CONFIG = {
+  // Same-origin path — Pages serves citations.bib next to index.html.
+  autoLoad: './citations.bib',
+  autoLoadLabel: 'citations.bib',
+
+  github: {
+    enabled: true,
+    repo: 'brandon/brandon_bib',   // owner/repo
+    branch: 'main',                // your default branch
+    path: 'citations.bib',         // path inside the repo
+    // … leave the rest at defaults …
+  },
+  // …
+};
+```
+
+Commit and push.
+
+**Step 3 — Enable Pages.** In `brandon_bib`'s **Settings → Pages**,
+set **Source = Deploy from a branch**, branch `main`, folder `/` (root).
+Save. After ~30 seconds the site is live at
+`https://brandon.github.io/brandon_bib/`. It auto-loads `citations.bib`
+on every visit.
+
+**Step 4 — Enable saving back.** GitCite needs a credential to write to
+the repo. Two choices:
+
+- **PAT (simplest, single user).** In GitCite click **Sign in → Personal
+  Access Token**. Follow the link to GitHub, create a fine-grained token
+  scoped to `brandon_bib` only with **Contents: Read and write**
+  permission, paste it back. Tokens are encrypted with a passphrase before
+  being stored in `localStorage`. From now on the **Save changes** button
+  commits directly to `main`.
+- **OAuth device flow (multi-user, no PAT in user hands).** Deploy the
+  Cloudflare Worker from `oauth-relay/RELAY_SETUP.md`, register a public
+  GitHub OAuth App, then set in your `index.html`:
+
+  ```js
+  github: {
+    // … keys from Step 2 …
+    oauthRelay: 'https://your-relay.workers.dev',
+    oauthClientId: 'Iv1.xxxxxxxxxxxxxxxx',
+  },
+  ```
+
+**Step 5 — Verify the round-trip.** Open the live URL, edit any entry,
+click **Save changes**. GitHub commits to `main`, which triggers a Pages
+rebuild (~30 s). Reload the page; the change is reflected and the
+unsaved-changes pill is empty.
+
+**Notes**
+- *Pages cache lag.* The hosted `citations.bib` lags committed state by
+  the Pages rebuild window (typically 10-60 s). GitCite's auto-pull on
+  startup detects this and prompts you to pull the newer file when you
+  return.
+- *Public repos only — for free Pages.* Private repos need a paid plan
+  to enable Pages. The library file itself is public on the github.io
+  domain whether or not the repo is private.
+- *Forking GitCite is optional in this flow.* You're using the
+  pre-built file; you only fork this repo if you want to edit GitCite
+  itself.
 
 ## Providing updates
 
