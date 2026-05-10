@@ -135,23 +135,6 @@ html, body {
   box-shadow: inset 0 -3px 0 var(--focus-ring);
 }
 
-/* Visually-hidden helper — used by the skip-link target H1 and any
-   other content that needs to be reachable by AT but not visually
-   rendered. Becomes visible while focused so sighted keyboard users
-   can see where they landed (Phase 14 B.3). */
-.gitcite-sr-h1 {
-  position: absolute;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-}
-.gitcite-sr-h1:focus {
-  position: static;
-  left: auto;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  outline: var(--focus-ring-width) solid var(--focus-ring);
-  outline-offset: var(--focus-ring-offset);
-}
+/* .gitcite-sr-h1 lives in hit-area.css (single source of truth — the
+   clip:rect strategy). Phase 17 a11y-review m2 removed the duplicate
+   from this file. */

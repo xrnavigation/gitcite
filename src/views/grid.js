@@ -407,8 +407,13 @@
             navigator.clipboard.writeText(text);
           }
         } catch (_) {}
+        // Phase 17 a11y-review m5 — include a snippet of the copied text
+        // so the announce string differs per cell. The polite-region
+        // throttle keys on exact text; a bare "Title copied" announce
+        // for every Title cell would silently drop after the first.
         if (globalThis.GitCiteAnnounce) {
-          globalThis.GitCiteAnnounce.polite(`${colLabel} copied`);
+          const snippet = text.length > 40 ? text.slice(0, 37) + '…' : text;
+          globalThis.GitCiteAnnounce.polite(`${colLabel} copied: ${snippet}`);
         }
         return;
       }
@@ -564,6 +569,15 @@
   // row reflect the new column set. Sort state is preserved when the
   // sorted column is still visible.
   function applyPrefs(prefs) {
+    // Phase 17 a11y-review m7 — preserve focus continuity across the
+    // mount-rebuild. If the user has a cell focused (e.g., they opened
+    // Settings via Tab from the grid, toggled a column, and the rebuild
+    // would otherwise drop them on body), restore the same coordinates
+    // — clamped to the new column count — after the new table renders.
+    const wasFocusedInGrid = !!(_table && document.activeElement && _table.contains(document.activeElement));
+    const savedRow = _focusRow;
+    const savedCol = _focusCol;
+
     if (!Array.isArray(prefs) || prefs.length === 0) {
       COLUMNS = ALL_COLUMNS.slice();
     } else {
@@ -584,6 +598,11 @@
     if (_host) {
       mount(_host, _opts);
       update(_entries);
+      if (wasFocusedInGrid) {
+        const col = Math.min(savedCol, COLUMNS.length - 1);
+        const row = Math.min(savedRow, Math.max(HEADER_ROW, _view.length - 1));
+        try { focusCell({ row, col }); } catch (_) {}
+      }
     }
   }
 

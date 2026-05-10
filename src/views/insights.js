@@ -101,19 +101,25 @@
   function bar({ label, value, percent, filter, filterLabel }) {
     const item = document.createElement('button');
     item.type = 'button';
-    // Phase 17 #11 — when a filter spec is supplied, the button's label
-    // says what activating it will do ("Filter library by …") so screen
-    // readers convey the affordance, not just the data.
-    const aLabel = filter
-      ? `Filter library by ${filterLabel || label} — ${value} ${value === 1 ? 'entry' : 'entries'} (${percent}%)`
-      : `${label}: ${value} (${percent}%)`;
-    item.setAttribute('aria-label', aLabel);
     item.style.cssText = 'display:block;width:100%;text-align:left;background:none;color:var(--fg);border:1px solid transparent;padding:0.25rem 0.5rem;min-block-size:44px;cursor:pointer;';
-    item.addEventListener('focus', () => { item.style.outline = '2px solid var(--focus-ring)'; });
-    item.addEventListener('blur', () => { item.style.outline = ''; });
+    // Phase 17 a11y-review M1 — Label in Name (WCAG 2.5.3): the visible
+    // text "<label> — <value> (<percent>%)" must appear at the start of
+    // the accessible name. Wrap the visible label first; append a
+    // visually-hidden affordance suffix so the accessible name reads
+    // "<label> — <value> (<percent>%). Activates filter for <filterLabel>."
+    // Voice-control users can now say "click 2020 — 14 (12%)" and hit it.
+    // Phase 17 a11y-review m3 — drop the inline focus/blur listeners and
+    // rely on the global :focus-visible rule for consistency with the
+    // rest of the app.
     const txt = document.createElement('span');
     txt.textContent = `${label} — ${value} (${percent}%)`;
     item.appendChild(txt);
+    if (filter) {
+      const sr = document.createElement('span');
+      sr.className = 'gitcite-sr-h1';
+      sr.textContent = `. Activates filter for ${filterLabel || label}.`;
+      item.appendChild(sr);
+    }
     const fill = document.createElement('div');
     fill.style.cssText = `height:8px;background:var(--accent);width:${Math.max(2, percent)}%;margin-block-start:0.25rem;`;
     fill.setAttribute('aria-hidden', 'true');

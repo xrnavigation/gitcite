@@ -141,7 +141,9 @@
     const wrap = document.createElement('div');
     wrap.setAttribute('role', 'list');
     wrap.setAttribute('aria-label', ariaLabel);
-    wrap.setAttribute('aria-describedby', opts.describedBy || '');
+    // Phase 17 a11y-review m1 — only set aria-describedby when truthy.
+    // An empty value is invalid ARIA and some AT log warnings.
+    if (opts.describedBy) wrap.setAttribute('aria-describedby', opts.describedBy);
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:0.25rem;border:1px solid var(--border);border-radius:4px;padding:0.5rem;';
 
     let state = items.slice();
@@ -197,6 +199,12 @@
         cb.addEventListener('change', () => {
           state[i].visible = cb.checked;
           fire();
+          // Phase 17 a11y-review M4 — announce so SR users get parity
+          // with Move / Drop / Theme actions. The throttle is per
+          // exact-text so toggling different items is not suppressed.
+          if (globalThis.GitCiteAnnounce) {
+            globalThis.GitCiteAnnounce.polite(`${item.label} ${cb.checked ? 'shown' : 'hidden'}`);
+          }
         });
         cbLabel.appendChild(cb);
         cbLabel.appendChild(document.createTextNode(' Show'));
@@ -257,11 +265,24 @@
       // Track the moved item so focus stays with it after rerender.
       if (grabbedIndex === from) grabbedIndex = to;
       render();
-      // Restore focus to the same control type the user was using.
-      const focusBtn = (grabbedIndex === to)
-        ? wrap.querySelector(`[data-pos="${to}"] [data-grab]`)
-        : wrap.querySelector(`[data-pos="${to}"] [data-move-${to > from ? 'down' : 'up'}]`);
-      if (focusBtn && !focusBtn.disabled) try { focusBtn.focus(); } catch (_) {}
+      // Phase 17 a11y-review M3 — restore focus intelligently. When the
+      // grab toggle is the active control, refocus it. Otherwise prefer
+      // the same-direction button the user pressed; if that button is
+      // disabled at the new position (we hit the top with Move-up or the
+      // bottom with Move-down), fall back to the OPPOSITE direction
+      // button on the same row so the user is still on a button of the
+      // same kind ("Move ...") rather than being teleported to "Grab".
+      let focusBtn;
+      if (grabbedIndex === to) {
+        focusBtn = wrap.querySelector(`[data-pos="${to}"] [data-grab]`);
+      } else {
+        const sameDir = to > from ? 'down' : 'up';
+        const oppDir  = to > from ? 'up'   : 'down';
+        const same = wrap.querySelector(`[data-pos="${to}"] [data-move-${sameDir}]`);
+        const opp  = wrap.querySelector(`[data-pos="${to}"] [data-move-${oppDir}]`);
+        focusBtn = (same && !same.disabled) ? same : (opp && !opp.disabled) ? opp : null;
+      }
+      if (focusBtn) try { focusBtn.focus(); } catch (_) {}
       else {
         const grab = wrap.querySelector(`[data-pos="${to}"] [data-grab]`);
         if (grab) try { grab.focus(); } catch (_) {}

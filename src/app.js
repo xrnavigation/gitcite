@@ -228,9 +228,14 @@
         if (globalThis.GitCiteInsights && typeof globalThis.GitCiteInsights.open === 'function') {
           // Phase 17 #11 — pass a callback so insights can apply a filter,
           // close itself, and let the library re-render with announce.
+          // Phase 17 a11y-review M2 — REPLACE _criteria, don't merge.
+          // Insights presents an at-a-glance view; clicking a bar should
+          // mean "narrow to this facet alone", not "AND this with whatever
+          // I had typed in the search box earlier". Replacement matches
+          // the user's mental model and makes the announce-count accurate.
           globalThis.GitCiteInsights.open(model.entries, {
             onApplyFilter: (patch, label) => {
-              _criteria = { ..._criteria, ...patch };
+              _criteria = { ...patch };
               refreshList();
               if (Announce && Announce.polite) {
                 const filtered = globalThis.GitCiteFilter.applyFilters(model.entries, _criteria);

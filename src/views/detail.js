@@ -60,7 +60,19 @@
       try {
         await navigator.clipboard.writeText(apaText.textContent);
         if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('APA citation copied');
-      } catch (_) {}
+      } catch (_) {
+        // Phase 17 a11y-review m4 — fall back when clipboard API is
+        // unavailable or refused (insecure context, missing permission).
+        // Select the text so the user can Ctrl+C manually, and tell them.
+        try {
+          const r = document.createRange();
+          r.selectNodeContents(apaText);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+        } catch (_) {}
+        if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('Could not copy automatically. Citation text is selected — press Ctrl+C to copy.');
+      }
     });
     apaWrap.appendChild(apaCopy);
     _host.appendChild(apaWrap);
@@ -176,7 +188,16 @@
       try {
         await navigator.clipboard.writeText(p.textContent);
         if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('Citation copied');
-      } catch (_) {}
+      } catch (_) {
+        try {
+          const r = document.createRange();
+          r.selectNodeContents(p);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+        } catch (_) {}
+        if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('Could not copy automatically. Citation text is selected — press Ctrl+C to copy.');
+      }
     });
     wrap.appendChild(copy);
     return wrap;

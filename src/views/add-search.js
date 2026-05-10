@@ -443,15 +443,15 @@
         });
         ctx.offset = 0;
         ctx.lastTotal = out.total;
-        // Phase 17 #4 — focus the results heading after the fallback
-        // succeeds so screen readers anchor the user above the new list
-        // (and focus stays inside the dialog).
-        ctx.pendingFocusHeading = true;
         updatePager(ctx, out, limit, 0);
         renderResults(ctx, out);
-        if (ctx.resultsHeading) ctx.resultsHeading.style.display = '';
-        if (ctx.pendingFocusHeading) {
-          ctx.pendingFocusHeading = false;
+        // Phase 17 #4 / a11y-review m6 — focus the results heading after
+        // the fallback succeeds so SR users anchor above the new list and
+        // focus stays inside the dialog. Single, direct focus call —
+        // earlier versions piped through ctx.pendingFocusHeading + the
+        // runSearch path, which created two ways for one concern.
+        if (ctx.resultsHeading) {
+          ctx.resultsHeading.style.display = '';
           try { ctx.resultsHeading.focus(); } catch (_) {}
         }
       } catch (e) {
