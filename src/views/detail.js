@@ -30,8 +30,40 @@
     const title = document.createElement('h2');
     title.id = titleId;
     title.textContent = f.title || '(untitled)';
+    // Phase 17 #16/#17 — H2 is the focus target when Enter activates a
+    // grid row. tabindex=-1 lets us programmatically focus it without
+    // putting it in the tab order.
+    title.setAttribute('tabindex', '-1');
     _host.appendChild(title);
     _host.setAttribute('aria-labelledby', titleId);
+
+    // Phase 17 #15 — APA citation is the default visible citation block
+    // (Chicago lives in a disclosure further down for users who want it).
+    // Includes a Copy button that copies the rendered APA text to the
+    // clipboard and announces "APA citation copied".
+    const apaWrap = document.createElement('section');
+    apaWrap.setAttribute('aria-label', 'APA citation');
+    apaWrap.style.cssText = 'margin-block:0.5rem;padding:0.5rem;background:var(--bg-elevated);border-radius:4px;';
+    const apaText = document.createElement('p');
+    apaText.setAttribute('data-apa-citation', '');
+    apaText.style.cssText = 'margin:0 0 0.5rem;line-height:1.5;';
+    apaText.textContent = globalThis.GitCiteAPA
+      ? globalThis.GitCiteAPA.render(entry)
+      : `${f.author || ''}. (${f.year || 'n.d.'}). ${f.title || ''}.`;
+    apaWrap.appendChild(apaText);
+    const apaCopy = document.createElement('button');
+    apaCopy.type = 'button';
+    apaCopy.setAttribute('data-copy-apa', '');
+    apaCopy.textContent = 'Copy APA citation';
+    apaCopy.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    apaCopy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(apaText.textContent);
+        if (globalThis.GitCiteAnnounce) globalThis.GitCiteAnnounce.polite('APA citation copied');
+      } catch (_) {}
+    });
+    apaWrap.appendChild(apaCopy);
+    _host.appendChild(apaWrap);
 
     const meta = document.createElement('p');
     meta.textContent = `${f.author || '—'} · ${f.year || f.date_range || '—'} · ${entry.type}`;
@@ -208,5 +240,13 @@
     }
   }
 
-  globalThis.GitCiteDetail = { mount, show, current: () => _entry };
+  function focus() {
+    if (!_host) return false;
+    const h = _host.querySelector('h2');
+    if (!h) return false;
+    try { h.focus(); } catch (_) {}
+    return true;
+  }
+
+  globalThis.GitCiteDetail = { mount, show, focus, current: () => _entry };
 })();

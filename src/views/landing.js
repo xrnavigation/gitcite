@@ -51,60 +51,49 @@
       host.appendChild(liveHint);
     }
 
-    // Import .bib / .bibtex (file picker)
-    const bibBtn = document.createElement('button');
-    bibBtn.type = 'button';
-    bibBtn.setAttribute('data-import-bib', '');
-    bibBtn.textContent = 'Import .bib / .bibtex';
-    bibBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
-    const bibInput = document.createElement('input');
-    bibInput.type = 'file';
-    bibInput.accept = '.bib,.bibtex,text/plain,text/x-bibtex,application/x-bibtex';
-    bibInput.style.cssText = 'position:absolute;left:-9999px;';
-    bibInput.id = 'gitcite-bib-input';
-    bibInput.setAttribute('aria-label', 'Pick a .bib or .bibtex file');
-    bibInput.setAttribute('aria-hidden', 'true');
-    bibInput.tabIndex = -1;
-    bibBtn.addEventListener('click', () => bibInput.click());
-    bibInput.addEventListener('change', async () => {
-      const f = bibInput.files && bibInput.files[0];
+    // Phase 17 #3 — single Import button. The two prior buttons (Import .bib
+    // / .bibtex and Import .csv) collapse into one. Format is detected from
+    // the file extension first, then by sniffing the first non-whitespace
+    // character (@ → BibTeX, else CSV). data-import-bib / data-import-csv
+    // attrs are preserved on the underlying inputs so existing tests that
+    // target those selectors keep working.
+    const importBtn = document.createElement('button');
+    importBtn.type = 'button';
+    importBtn.setAttribute('data-import-any', '');
+    importBtn.setAttribute('data-import-bib', '');
+    importBtn.setAttribute('data-import-csv', '');
+    importBtn.textContent = 'Import .bib / .bibtex / .csv';
+    importBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;';
+    const importInput = document.createElement('input');
+    importInput.type = 'file';
+    importInput.accept = '.bib,.bibtex,.csv,text/plain,text/csv,text/x-bibtex,application/x-bibtex';
+    importInput.style.cssText = 'position:absolute;left:-9999px;';
+    importInput.id = 'gitcite-import-input';
+    importInput.setAttribute('aria-label', 'Pick a .bib, .bibtex, or .csv file');
+    importInput.setAttribute('aria-hidden', 'true');
+    importInput.tabIndex = -1;
+    importBtn.addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', async () => {
+      const f = importInput.files && importInput.files[0];
       if (!f) return;
       const text = await f.text();
-      if (typeof opts.onBib === 'function') opts.onBib(text, f);
+      const name = (f.name || '').toLowerCase();
+      // Sniff: first non-whitespace char of file content.
+      const firstNonWs = (text.match(/\S/) || [''])[0];
+      const isBib = /\.bib(tex)?$/.test(name) || firstNonWs === '@';
+      if (isBib && typeof opts.onBib === 'function') opts.onBib(text, f);
+      else if (typeof opts.onCsv === 'function') opts.onCsv(text, f);
+      importInput.value = '';
     });
-    host.appendChild(bibBtn);
-    host.appendChild(bibInput);
-
-    // Import .csv
-    const csvBtn = document.createElement('button');
-    csvBtn.type = 'button';
-    csvBtn.setAttribute('data-import-csv', '');
-    csvBtn.textContent = 'Import .csv';
-    csvBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-left:0.5rem;';
-    const csvInput = document.createElement('input');
-    csvInput.type = 'file';
-    csvInput.accept = '.csv,text/csv';
-    csvInput.style.cssText = 'position:absolute;left:-9999px;';
-    csvInput.id = 'gitcite-csv-input';
-    csvInput.setAttribute('aria-label', 'Pick a .csv file');
-    csvInput.setAttribute('aria-hidden', 'true');
-    csvInput.tabIndex = -1;
-    csvBtn.addEventListener('click', () => csvInput.click());
-    csvInput.addEventListener('change', async () => {
-      const f = csvInput.files && csvInput.files[0];
-      if (!f) return;
-      const text = await f.text();
-      if (typeof opts.onCsv === 'function') opts.onCsv(text, f);
-    });
-    host.appendChild(csvBtn);
-    host.appendChild(csvInput);
+    host.appendChild(importBtn);
+    host.appendChild(importInput);
 
     // Empty start
     const emptyBtn = document.createElement('button');
     emptyBtn.type = 'button';
     emptyBtn.setAttribute('data-empty-start', '');
     emptyBtn.textContent = 'Start with empty library';
-    emptyBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-left:0.5rem;';
+    emptyBtn.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-start:0.5rem;';
     emptyBtn.addEventListener('click', () => {
       if (typeof opts.onEmpty === 'function') opts.onEmpty();
     });

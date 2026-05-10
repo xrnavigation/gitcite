@@ -176,11 +176,25 @@
     status.setAttribute('role', 'status');
     form.appendChild(status);
 
+    // Phase 17 #4 — heading above the results region. Becomes the focus
+    // target after a successful (re-)search so screen readers immediately
+    // announce "heading level 3, Results" rather than "blank" when results
+    // are loaded via the OpenAlex fallback button. Hidden until at least
+    // one search completes.
+    const resultsHeading = document.createElement('h3');
+    resultsHeading.setAttribute('data-search-results-heading', '');
+    resultsHeading.id = 'add-search-results-heading';
+    resultsHeading.setAttribute('tabindex', '-1');
+    resultsHeading.style.cssText = 'margin-block-start:0.5rem;display:none;';
+    resultsHeading.textContent = 'Results';
+    form.appendChild(resultsHeading);
+
     // Phase 14 a11y-review (Major) — drop role="list" because result
     // cards are <article> elements, not role="listitem". role="list"
     // with non-listitem children produces "list with 0 items" in NVDA.
     const results = document.createElement('div');
     results.setAttribute('data-search-results', '');
+    results.setAttribute('aria-labelledby', 'add-search-results-heading');
     form.appendChild(results);
 
     // Phase 15 #8 — pagination controls. Hidden until a search returns
@@ -213,6 +227,7 @@
     // shared values without prop-drilling.
     const ctx = {
       form, input, provSelect, sizeSelect, error, recovery, status, results,
+      resultsHeading,
       pager, prevBtn, nextBtn, pageStatus, opts, handle,
       offset: 0,
       lastTotal: 0,
@@ -226,6 +241,9 @@
       // focus can be restored to it after the next render. The new node
       // is a different DOM element so we must look it up by data-attr.
       pendingFocus: null, // 'prev' | 'next' | null
+      // Phase 17 #4 — set after a fallback so the next successful render
+      // moves focus to the results heading instead of the pager.
+      pendingFocusHeading: false,
     };
 
     prevBtn.addEventListener('click', () => {
@@ -240,17 +258,20 @@
       ctx.pendingFocus = 'next';
       runSearch(ctx, { keepOffset: true, provider: ctx.activeProvider });
     });
+    // Phase 17 #7 — WCAG-compliant On Input behaviour. Changing provider
+    // or page size used to trigger a re-fetch immediately, which is a
+    // change of context for screen-reader users. Now both selects are
+    // pure form state: the next Search press (or pager click) consumes
+    // the value. Pager clicks already pass ctx.activeProvider, so a
+    // mid-pagination provider change is intentionally ignored until the
+    // user submits a new search.
     sizeSelect.addEventListener('change', () => {
+      // Reset offset so a new search starts on page 1, but don't fire.
       ctx.offset = 0;
-      // Only re-search if there's already a query / results.
-      if (results.children.length > 0) runSearch(ctx, { keepOffset: true, provider: ctx.activeProvider });
     });
-    // Phase 16 #3 — manual provider change resets pagination and re-runs.
     provSelect.addEventListener('change', () => {
-      if (results.children.length > 0) {
-        ctx.offset = 0;
-        runSearch(ctx);
-      }
+      // Reset offset; user must press Search to apply.
+      ctx.offset = 0;
     });
 
     // Mode change handler -----------------------------------------------
@@ -327,10 +348,19 @@
       ctx.activeProvider = mode === 'doi' ? null : provider;
       updatePager(ctx, out, limit, offset);
       renderResults(ctx, out);
-      // Phase 16 #2 — restore focus to the pager button the user clicked.
-      // If that button is now disabled (e.g., reached the first/last page),
-      // fall back to the other pager button so focus stays in the pager.
-      if (ctx.pendingFocus) {
+      // Phase 17 #4 — show the results heading once results render.
+      if (ctx.resultsHeading) ctx.resultsHeading.style.display = '';
+      // Phase 17 #4 — after a fallback (or any explicit "focus heading"
+      // trigger), move focus to the results heading so screen readers
+      // announce "heading level 3, Results" instead of falling silent.
+      if (ctx.pendingFocusHeading && ctx.resultsHeading) {
+        ctx.pendingFocusHeading = false;
+        ctx.pendingFocus = null;
+        try { ctx.resultsHeading.focus(); } catch (_) {}
+      } else if (ctx.pendingFocus) {
+        // Phase 16 #2 — restore focus to the pager button the user clicked.
+        // If that button is now disabled (e.g., reached the first/last page),
+        // fall back to the other pager button so focus stays in the pager.
         const want = ctx.pendingFocus;
         ctx.pendingFocus = null;
         const target = (want === 'prev' && !ctx.prevBtn.disabled) ? ctx.prevBtn
@@ -396,7 +426,13 @@
     // context.
     btn.textContent = 'Retry this search using OpenAlex';
     btn.addEventListener('click', async () => {
+      // Phase 17 #6 — sticky OpenAlex. Set BOTH the live <select> and
+      // ctx.activeProvider so the next pager click and any subsequent
+      // search both stay on OpenAlex (the prior version only set the
+      // select; pagination read ctx.activeProvider, which still pointed
+      // at Semantic Scholar).
       provSelect.value = 'openalex';
+      ctx.activeProvider = 'openalex';
       error.textContent = '';
       btn.remove();
       status.textContent = 'Searching…';
@@ -407,11 +443,25 @@
         });
         ctx.offset = 0;
         ctx.lastTotal = out.total;
+        // Phase 17 #4 — focus the results heading after the fallback
+        // succeeds so screen readers anchor the user above the new list
+        // (and focus stays inside the dialog).
+        ctx.pendingFocusHeading = true;
         updatePager(ctx, out, limit, 0);
         renderResults(ctx, out);
+        if (ctx.resultsHeading) ctx.resultsHeading.style.display = '';
+        if (ctx.pendingFocusHeading) {
+          ctx.pendingFocusHeading = false;
+          try { ctx.resultsHeading.focus(); } catch (_) {}
+        }
       } catch (e) {
+        // Phase 17 #4 — keep the network error visible inside the dialog
+        // and do NOT move focus out. The next focusable element after the
+        // (now-removed) fallback button is wherever focus naturally lands;
+        // we re-render a fresh fallback button and refocus it.
         error.textContent = (e && e.message) || 'OpenAlex search failed';
         status.textContent = '';
+        renderFallback(ctx, mode);
       }
     });
     host.appendChild(btn);

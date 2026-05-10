@@ -143,6 +143,7 @@
   function setupHeaderToolbar() {
     const host = document.querySelector('[data-toolbar-host]');
     if (!host || !globalThis.GitCiteHeaderToolbar) return;
+    const empty = model.entries.length === 0;
     const items = [
       { id: 'library', label: 'Library' },
       { id: 'add-citation', label: 'Add citation manually', title: 'Type fields directly into a blank entry form.' },
@@ -151,9 +152,19 @@
       // start disabled and let refreshList() flip the state when entries
       // exist. Disabled buttons stay focusable (browsers expose them) but
       // are not actionable, so screen readers announce the precondition.
-      { id: 'find-replace', label: 'Find / Replace', disabled: model.entries.length === 0 },
-      { id: 'insights', label: 'Insights' },
-      { id: 'stats', label: 'Stats' },
+      { id: 'find-replace', label: 'Find / Replace', disabled: empty },
+      // Phase 17 #2 — Insights is meaningless on an empty library
+      // (every panel reads from model.entries). Same gating pattern as
+      // Find / Replace.
+      // Phase 17 #12 — Stats removed. The previous toolbar exposed both
+      // Insights and Stats but they invoked the same modal. Insights
+      // already covers Overview / Citation Age / Authors / Venues /
+      // JEL / Quality, so the redundant Stats button is dropped.
+      { id: 'insights', label: 'Insights', disabled: empty },
+      // Phase 17 #8 — Settings entry point. Always available so a user
+      // arriving at an empty library can still configure GitHub auth,
+      // theme, and column / field defaults before importing.
+      { id: 'settings', label: 'Settings', title: 'Sign in to GitHub, choose theme, and pick which library columns and add-citation fields to show.' },
       { id: 'shortcuts', label: 'Shortcuts' },
       { id: 'about', label: 'About' },
       // Phase 15 #10 — clearer label. "Reload library" sounded like a
@@ -204,13 +215,23 @@
         return;
       case 'insights':
         if (globalThis.GitCiteInsights && typeof globalThis.GitCiteInsights.open === 'function') {
-          globalThis.GitCiteInsights.open(model.entries);
+          // Phase 17 #11 — pass a callback so insights can apply a filter,
+          // close itself, and let the library re-render with announce.
+          globalThis.GitCiteInsights.open(model.entries, {
+            onApplyFilter: (patch, label) => {
+              _criteria = { ..._criteria, ...patch };
+              refreshList();
+              if (Announce && Announce.polite) {
+                const filtered = globalThis.GitCiteFilter.applyFilters(model.entries, _criteria);
+                Announce.polite(`Filtering by ${label}. Loaded ${filtered.length} ${filtered.length === 1 ? 'result' : 'results'}.`);
+              }
+            },
+          });
         }
         return;
-      case 'stats':
-        if (globalThis.GitCiteInsights && typeof globalThis.GitCiteInsights.open === 'function') {
-          // Stats is co-located with Insights; this opens the same modal.
-          globalThis.GitCiteInsights.open(model.entries);
+      case 'settings':
+        if (globalThis.GitCiteSettings && typeof globalThis.GitCiteSettings.open === 'function') {
+          globalThis.GitCiteSettings.open();
         }
         return;
       case 'shortcuts':
@@ -571,17 +592,20 @@
       onChange: (q) => { _criteria = { ..._criteria, query: q }; refreshList(); },
     });
 
-    // Phase 13 Edit 2 — accessible role=grid library view (replaces
-    // the virtual list). Enter / F2 on a data row opens the row-action
-    // dialog (Edit 3 — wired in Phase 13.3).
+    // Phase 17 #16/#17 — Enter on a row goes directly to the detail
+    // view in the aside (was: open the row-action menu dialog with an
+    // "Open detail" button). Edit / Duplicate / Delete affordances
+    // already live in detail.js, so the menu dialog was duplicating UI
+    // the user had to click through. Focus moves to the title H2 of the
+    // detail view; aside is unhidden if it was hidden.
     if (globalThis.GitCiteGrid) {
       globalThis.GitCiteGrid.mount(listSlot, {
         onActivate: (entry) => {
-          if (globalThis.GitCiteRowAction) {
-            globalThis.GitCiteRowAction.open(entry, rowActionHandlers());
-          } else {
-            globalThis.GitCiteDetail.show(entry);
-          }
+          if (aside) aside.hidden = false;
+          globalThis.GitCiteDetail.show(entry);
+          // Defer focus to next tick so the new H2 is in the DOM and
+          // any aside-unhide reflow has completed.
+          setTimeout(() => { try { globalThis.GitCiteDetail.focus(); } catch (_) {} }, 0);
         },
       });
     } else if (globalThis.GitCiteList) {
@@ -842,11 +866,13 @@
     // sync with model.entries.length. Re-mount if the sidebar is open.
     const nav = document.querySelector('nav');
     if (nav && !nav.hidden) mountSidebarActions(nav);
-    // Phase 16 #1 — toggle Find/Replace based on whether the library has
-    // any entries.
+    // Phase 16 #1 / Phase 17 #2 — toggle Find/Replace AND Insights based
+    // on whether the library has any entries.
     const tbHost = document.querySelector('[data-toolbar-host]');
     if (tbHost && globalThis.GitCiteHeaderToolbar && globalThis.GitCiteHeaderToolbar.setEnabled) {
-      globalThis.GitCiteHeaderToolbar.setEnabled(tbHost, 'find-replace', model.entries.length > 0);
+      const populated = model.entries.length > 0;
+      globalThis.GitCiteHeaderToolbar.setEnabled(tbHost, 'find-replace', populated);
+      globalThis.GitCiteHeaderToolbar.setEnabled(tbHost, 'insights', populated);
     }
   }
 

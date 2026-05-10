@@ -374,7 +374,7 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     expect(lastCall.offset).toBe(10);
   });
 
-  it('Phase 16 #3 — manually changing the provider resets pagination and re-runs', async () => {
+  it('Phase 17 #7 — manually changing the provider does NOT auto-fire a search; user must press Search', async () => {
     const search = vi.fn(async (opts) => ({
       results: [{ title: `from-${opts.provider}-${opts.offset}`, authors: 'A', year: '2024', doi: '', url: 'https://x' }],
       total: 100,
@@ -387,9 +387,15 @@ describe('Phase 13 Edit 1 — multi-mode add-citation modal', () => {
     await new Promise((r) => setTimeout(r, 0));
     document.querySelector('dialog [data-search-next]').click(); // → offset 10
     await new Promise((r) => setTimeout(r, 5));
+    const callsBefore = search.mock.calls.length;
     const provSel = document.querySelector('dialog [data-search-provider]');
     provSel.value = 'crossref';
     provSel.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 5));
+    // WCAG 3.2.2 / Phase 17 #7 — change of a select must NOT trigger a
+    // network fetch. The user must press Search again.
+    expect(search.mock.calls.length).toBe(callsBefore);
+    document.querySelector('dialog [data-search-submit]').click();
     await new Promise((r) => setTimeout(r, 5));
     const lastCall = search.mock.calls.at(-1)[0];
     expect(lastCall.provider).toBe('crossref');
