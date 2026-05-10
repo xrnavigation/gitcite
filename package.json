@@ -5,9 +5,10 @@
   "description": "Single-file, client-side BibTeX reference manager with GitHub save. WCAG 2.2 AAA.",
   "type": "module",
   "scripts": {
-    "build": "bash tools/concat.sh",
+    "build": "node tools/concat.mjs",
     "start": "npm run build && npx --yes serve dist -l 8080 --no-clipboard",
     "serve": "npx --yes serve dist -l 8080 --no-clipboard",
+    "deploy:pages": "npm run build && echo \"dist/index.html ready — pushed to main triggers .github/workflows/pages.yml\"",
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
     "test:e2e": "playwright test",

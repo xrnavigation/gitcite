@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+# Builds the single-file ship (`dist/index.html`) and publishes it to GitHub
+# Pages. To enable: in the repo Settings → Pages, set "Source" to "GitHub
+# Actions". The site will be served at https://<owner>.github.io/<repo>/.
+#
+# `dist/index.html` is also committed to main so users can grab it directly
+# without waiting for a Pages build, but Pages gives a permanent hosted URL
+# (which is what makes features like file:// → relative-path autoLoad work).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build single-file ship
+        run: node tools/concat.mjs
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

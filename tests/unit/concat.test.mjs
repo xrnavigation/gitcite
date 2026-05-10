@@ -7,9 +7,9 @@ const ROOT = resolve(process.cwd());
 const DIST = resolve(ROOT, 'dist/index.html');
 const SRC = resolve(ROOT, 'src/index.html');
 
-describe('tools/concat.sh', () => {
+describe('tools/concat.mjs', () => {
   beforeAll(() => {
-    execSync('bash tools/concat.sh', { cwd: ROOT, stdio: 'pipe' });
+    execSync('node tools/concat.mjs', { cwd: ROOT, stdio: 'pipe' });
   });
 
   it('produces dist/index.html', () => {
@@ -20,7 +20,7 @@ describe('tools/concat.sh', () => {
 
   it('produces a byte-identical artifact across two runs', () => {
     const first = readFileSync(DIST);
-    execSync('bash tools/concat.sh', { cwd: ROOT, stdio: 'pipe' });
+    execSync('node tools/concat.mjs', { cwd: ROOT, stdio: 'pipe' });
     const second = readFileSync(DIST);
     expect(Buffer.compare(first, second)).toBe(0);
   });

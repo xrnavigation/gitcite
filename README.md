@@ -29,11 +29,16 @@ browser and it works.
    `src/config.js` (or directly in `dist/index.html`) to point at where the
    library file should live.
 3. Place an initial `.bib` file at `GITCITE_CONFIG.autoLoad`.
-4. Run `bash tools/concat.sh` to produce `dist/index.html` (the single-file
-   shipped artifact).
-5. Enable GitHub Pages on the fork — Settings → Pages → Source: main
-   branch, `/` (root) — and host `dist/index.html`.
-6. Visit the deployed URL.
+4. Run `npm run build` (or `node tools/concat.mjs` directly) to produce
+   `dist/index.html` (the single-file shipped artifact). The built file is
+   committed to `main`, so a fresh clone already has it ready to open.
+5. Enable GitHub Pages on the fork — Settings → Pages → Source: **GitHub
+   Actions**. The included workflow (`.github/workflows/pages.yml`) builds
+   and deploys `dist/` on every push to `main`. Alternatively, choose
+   Source: branch `main` → folder `/dist`.
+6. Visit the deployed URL — or open `dist/index.html` directly from the
+   filesystem (most features work on `file://`; the only limitation is that
+   a relative-path `autoLoad` is blocked by browser CORS).
 
 At this point GitCite works as an offline editor with file download. The
 next two documents are needed only if the deployer wants Save-to-GitHub.
@@ -77,7 +82,7 @@ in Playwright. The deviations register lives at the top of `src/index.html`.
 
 ```sh
 npm install
-npm run build           # tools/concat.sh → dist/index.html
+npm run build           # node tools/concat.mjs → dist/index.html
 npm run test:unit       # vitest jsdom + pure-function unit tests
 npm run test:component  # vitest + jsdom component tests
 npm run test:e2e        # Playwright + axe-core

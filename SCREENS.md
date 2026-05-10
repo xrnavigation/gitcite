@@ -776,7 +776,7 @@ phase that delivers it.
 | Auth + crypto | `src/github/{auth-modal,pat,oauth-device,local-bridge,crypto}.js` |
 | Save / conflict / PR fallback / auto-pull | `src/github/{save,conflict-dialog,pr-fallback,auto-pull}.js` |
 | About / privacy | `src/views/about.js` |
-| Single-file build | `tools/concat.sh` |
+| Single-file build | `tools/concat.mjs` |
 | Token-contrast audit | `tools/contrast-audit.mjs`, `tools/contrast.mjs` |
 | Tests | `tests/{unit,component,e2e}/` |
 | OAuth relay | `oauth-relay/{worker.js,wrangler.toml,RELAY_SETUP.md}` |
