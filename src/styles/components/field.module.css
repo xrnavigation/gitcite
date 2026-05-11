@@ -1,0 +1,23 @@
+/* Field primitive, help text, and error summary. */
+.gitcite-field {
+  display: grid;
+  gap: var(--space-1);
+  margin-block-end: var(--space-3);
+}
+
+.gitcite-field-help {
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+
+.gitcite-field-error,
+.gitcite-error-summary {
+  color: var(--danger);
+}
+
+.gitcite-error-summary {
+  padding: var(--space-3);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-2);
+}

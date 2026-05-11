@@ -1,0 +1,53 @@
+/* Links and form controls. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+label {
+  color: var(--fg);
+  font-weight: 650;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-1);
+  background: var(--surface, var(--bg));
+  color: var(--fg);
+  padding: 0.58rem 0.7rem;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto !important;
+  height: auto;
+  inline-size: auto !important;
+  block-size: auto;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: color-mix(in srgb, var(--fg-muted) 82%, transparent);
+}
+
+fieldset {
+  background: var(--surface, var(--bg));
+}

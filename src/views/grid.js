@@ -96,6 +96,24 @@
   // when settings.js isn't loaded (component tests, etc.).
   const DEFAULT_COLUMN_NAMES = ['title', 'author', 'year', 'type', 'datasource', 'saved'];
   const ALL_COLUMNS = DEFAULT_COLUMN_NAMES.map(columnFor);
+  const COLUMN_WIDTHS = {
+    title: 360,
+    author: 260,
+    journal: 260,
+    booktitle: 260,
+    abstract: 340,
+    note: 260,
+    url: 260,
+    doi: 210,
+    key: 190,
+    type: 140,
+    datasource: 140,
+    saved: 120,
+    year: 96,
+    volume: 96,
+    number: 96,
+    pages: 110,
+  };
   let COLUMNS = ALL_COLUMNS.slice();
   const ROW_HEIGHT = 56;
   const HEADER_ROW = -1;
@@ -139,6 +157,14 @@
 
   function ids() { return globalThis.GitCiteIds; }
 
+  function columnWidth(col) {
+    return COLUMN_WIDTHS[col.key] || 180;
+  }
+
+  function tableMinWidth() {
+    return COLUMNS.reduce((sum, col) => sum + columnWidth(col), 0);
+  }
+
   function mount(host, opts) {
     _opts = opts || {};
     _host = host;
@@ -157,7 +183,7 @@
     table.setAttribute('aria-readonly', 'true');
     table.setAttribute('aria-labelledby', captionId);
     table.setAttribute('aria-colcount', String(COLUMNS.length));
-    table.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed;';
+    table.style.cssText = `width:max(100%, ${tableMinWidth()}px);min-width:${tableMinWidth()}px;border-collapse:collapse;table-layout:fixed;`;
 
     const caption = document.createElement('caption');
     caption.id = captionId;
@@ -166,9 +192,10 @@
     table.appendChild(caption);
 
     const colgroup = document.createElement('colgroup');
-    COLUMNS.forEach(() => {
+    COLUMNS.forEach((col) => {
       const c = document.createElement('col');
-      c.style.minWidth = '120px';
+      c.setAttribute('data-col-key', col.key);
+      c.style.width = columnWidth(col) + 'px';
       colgroup.appendChild(c);
     });
     table.appendChild(colgroup);
@@ -190,6 +217,7 @@
       h.setAttribute('tabindex', i === 0 ? '0' : '-1');
       h.setAttribute('data-row', String(HEADER_ROW));
       h.setAttribute('data-col', String(i));
+      h.setAttribute('data-col-key', col.key);
       h.style.cssText = 'min-block-size:44px;padding:0.5rem;font-weight:600;cursor:pointer;user-select:none;text-align:start;border-block-end:2px solid var(--border);';
       const label = document.createElement('span');
       label.textContent = col.label;
@@ -594,10 +622,25 @@
       cell.setAttribute('aria-colindex', String(ci + 1));
       cell.setAttribute('data-row', String(i));
       cell.setAttribute('data-col', String(ci));
+      cell.setAttribute('data-col-key', col.key);
       const tabbable = (i === _focusRow && ci === _focusCol);
       cell.setAttribute('tabindex', tabbable ? '0' : '-1');
-      cell.style.cssText = `padding:0.5rem;min-width:120px;min-block-size:44px;cursor:pointer;vertical-align:middle;`;
-      cell.textContent = col.get(entry);
+      cell.style.cssText = `padding:0.5rem;min-width:${columnWidth(col)}px;min-block-size:44px;cursor:pointer;vertical-align:middle;`;
+      const value = col.get(entry);
+      cell.title = value;
+      if (col.key === 'title') {
+        const strong = document.createElement('strong');
+        strong.setAttribute('data-grid-primary', '');
+        strong.textContent = value;
+        cell.appendChild(strong);
+      } else if (col.key === 'type' || col.key === 'saved' || col.key === 'datasource') {
+        const pill = document.createElement('span');
+        pill.setAttribute('data-grid-pill', col.key);
+        pill.textContent = value || '—';
+        cell.appendChild(pill);
+      } else {
+        cell.textContent = value;
+      }
       row.appendChild(cell);
     });
     return row;

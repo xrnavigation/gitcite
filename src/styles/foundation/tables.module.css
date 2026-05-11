@@ -1,0 +1,22 @@
+/* Generic table surface defaults. */
+table {
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+th {
+  background: var(--surface-strong, var(--bg-elevated));
+  color: var(--fg);
+}
+
+td {
+  border-block-end: 1px solid var(--border-subtle, var(--border));
+  color: var(--fg);
+}
+
+tr:hover td {
+  background: var(--bg-elevated);
+}

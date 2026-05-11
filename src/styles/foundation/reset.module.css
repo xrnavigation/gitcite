@@ -1,0 +1,17 @@
+/* Reset and document defaults. */
+/* Base body styling — minimal in Phase 1.A; component CSS lands per phase. */
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  background: var(--bg-page, var(--bg));
+  width: 100%;
+  overflow-x: hidden;
+}
+
+html,
