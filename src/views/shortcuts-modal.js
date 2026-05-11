@@ -22,6 +22,7 @@
     }
 
     const table = document.createElement('table');
+    table.setAttribute('data-shortcuts-table', '');
     const cap = document.createElement('caption');
     cap.textContent = 'Keyboard shortcuts';
     table.appendChild(cap);

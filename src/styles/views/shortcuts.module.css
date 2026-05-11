@@ -1,0 +1,35 @@
+/* Keyboard shortcuts modal table. */
+table[data-shortcuts-table] {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  box-shadow: none;
+}
+
+table[data-shortcuts-table] caption {
+  padding: var(--space-2) var(--space-3);
+  color: var(--fg-muted);
+  text-align: left;
+  font-weight: 650;
+}
+
+table[data-shortcuts-table] th,
+table[data-shortcuts-table] td {
+  padding: var(--space-3);
+  text-align: left;
+}
+
+table[data-shortcuts-table] th {
+  background: var(--surface-strong, var(--bg-elevated));
+  border-block-end: 1px solid var(--border);
+}
+
+table[data-shortcuts-table] td:first-child {
+  width: 12rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  font-weight: 700;
+}
+
+table[data-shortcuts-table] tbody tr:nth-child(even) td {
+  background: var(--bg-elevated);
+}

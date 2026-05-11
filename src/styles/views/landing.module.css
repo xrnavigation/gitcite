@@ -1,0 +1,29 @@
+/* Landing and empty-library surfaces. */
+[aria-label="Library import"] {
+  max-width: 48rem;
+  margin: min(8vh, 5rem) auto 0;
+  padding: clamp(var(--space-5), 4vw, 3rem);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-soft);
+}
+
+main > section[aria-labelledby] {
+  max-width: 52rem;
+  padding: clamp(var(--space-5), 4vw, 3rem);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-soft);
+}
+
+[data-drop-zone] {
+  background:
+    linear-gradient(135deg, var(--surface-strong, var(--bg-elevated)), var(--surface, var(--bg)));
+}
+
+[data-drop-zone]:hover {
+  border-color: var(--focus-ring);
+  color: var(--fg);
+}

@@ -1,0 +1,44 @@
+/* Settings reorderable list rows. */
+[role="list"][aria-label="Library columns"],
+[role="list"][aria-label="Default add-citation fields"] {
+  gap: var(--space-2) !important;
+  padding: var(--space-3) !important;
+  border-color: var(--border-subtle, var(--border)) !important;
+  border-radius: var(--radius-2) !important;
+  background: var(--surface, var(--bg));
+}
+
+[role="list"][aria-label="Library columns"] > [role="listitem"],
+[role="list"][aria-label="Default add-citation fields"] > [role="listitem"] {
+  display: grid !important;
+  grid-template-columns: 4.5rem minmax(16rem, 1fr) 6.5rem 7.5rem;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  padding: var(--space-2) !important;
+  border-color: var(--border-subtle, var(--border)) !important;
+  background: var(--bg);
+}
+
+[role="list"][aria-label="Library columns"] [data-vis-toggle],
+[role="list"][aria-label="Default add-citation fields"] [data-vis-toggle] {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  inline-size: 1.25rem !important;
+  block-size: 1.25rem !important;
+}
+
+[role="list"][aria-label="Library columns"] label,
+[role="list"][aria-label="Default add-citation fields"] label {
+  display: grid !important;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  min-width: 0;
+}
+
+[role="list"][aria-label="Library columns"] label,
+[role="list"][aria-label="Default add-citation fields"] label,
+[role="list"][aria-label="Library columns"] button,
+[role="list"][aria-label="Default add-citation fields"] button {
+  margin: 0;
+}

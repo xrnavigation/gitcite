@@ -32,6 +32,17 @@
   color-scheme: light dark;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --radius-1: 4px;
+  --radius-2: 8px;
+  --radius-3: 12px;
+  --shadow-soft: 0 16px 36px rgba(24, 24, 27, 0.10);
+  --shadow-dialog: 0 24px 70px rgba(24, 24, 27, 0.26);
 }
 
 :root[data-theme="light"] {
@@ -50,6 +61,12 @@
   --warning: #713f12;
   --warning-fg: #ffffff;
   --focus-ring: #1e40af;
+  --bg-page: #f8fafc;
+  --surface: #ffffff;
+  --surface-strong: #f4f4f5;
+  --border-subtle: #d4d4d8;
+  --accent-soft: #dbeafe;
+  --danger-soft: #fee2e2;
 }
 
 :root[data-theme="dark"] {
@@ -68,6 +85,14 @@
   --warning: #fde68a;
   --warning-fg: #0a0a0b;
   --focus-ring: #bfdbfe;
+  --bg-page: #050506;
+  --surface: #101013;
+  --surface-strong: #18181b;
+  --border-subtle: #3f3f46;
+  --accent-soft: #172554;
+  --danger-soft: #450a0a;
+  --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.42);
+  --shadow-dialog: 0 24px 70px rgba(0, 0, 0, 0.58);
 }
 
 /* Hard-contrast backstop. If any token is below 7:1 in its base form, override
@@ -99,18 +124,28 @@
     scroll-behavior: auto !important;
   }
 }
-
+</style>
+  <style>
+/* Reset and document defaults. */
 /* Base body styling — minimal in Phase 1.A; component CSS lands per phase. */
-html, body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  margin: 0;
+* {
+  box-sizing: border-box;
 }
 
-/* Skip link — visible on focus only. Always reachable for keyboard users. */
+[hidden] {
+  display: none !important;
+}
+
+html {
+  background: var(--bg-page, var(--bg));
+  width: 100%;
+  overflow-x: hidden;
+}
+
+html,
+</style>
+  <style>
+/* Skip link, focus ring, and theme toggle. */
 .skip-link {
   position: absolute;
   left: -9999px;
@@ -121,33 +156,506 @@ html, body {
   text-decoration: underline;
   z-index: 9999;
 }
+
 .skip-link:focus {
   left: 0.5rem;
   top: 0.5rem;
 }
 
-/* Focus appearance — >= 2 CSS px ring, >= 3:1 contrast (2.4.13).
-   :focus-visible only so mouse clicks do not show the ring. */
 :focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Theme toggle styling — header sun/moon button. Phase 1.A delivers a
-   text-only button; iconography lands later. */
 .theme-toggle {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding: 0.5rem 0.75rem;
   background: var(--bg-elevated);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-1);
   font-size: 1rem;
   cursor: pointer;
-  min-block-size: 44px;
-  min-inline-size: 44px;
 }
+
 .theme-toggle:hover {
   background: var(--bg-sunken);
+}
+</style>
+  <style>
+/* Top-level application shell and landmarks. */
+body {
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+body {
+  width: 100%;
+  overflow-x: hidden;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, var(--bg) 0, var(--bg-page, var(--bg)) 22rem);
+  display: grid;
+  grid-template:
+    "header header" auto
+    "nav main" minmax(0, 1fr)
+    "footer footer" auto / minmax(14rem, 18rem) minmax(0, 1fr);
+}
+
+body:has(nav[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "header"
+    "main"
+    "footer";
+}
+
+header,
+nav,
+main,
+footer {
+  min-width: 0;
+}
+
+header {
+  grid-area: header;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) clamp(var(--space-4), 3vw, var(--space-6));
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border-block-end: 1px solid var(--border-subtle, var(--border));
+  backdrop-filter: blur(16px);
+}
+
+header [data-toolbar-host] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+header [data-pill-host],
+header [data-save-host],
+header [data-auth-toggle-host] {
+  flex: 0 0 auto;
+}
+
+nav {
+  grid-area: nav;
+  align-self: start;
+  position: sticky;
+  top: 5rem;
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  margin: var(--space-5) 0 var(--space-5) clamp(var(--space-4), 3vw, var(--space-6));
+  padding: var(--space-4);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-soft);
+}
+
+main {
+  grid-area: main;
+  width: min(100%, 76rem);
+  margin-inline: auto;
+  padding: var(--space-5) clamp(var(--space-4), 3vw, var(--space-6)) var(--space-6);
+}
+
+body:has(nav:not([hidden])) main {
+  width: 100%;
+  margin-inline: 0;
+}
+
+aside {
+  display: none;
+}
+
+footer {
+  grid-area: footer;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-6)) var(--space-5);
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+</style>
+  <style>
+/* Global typography primitives. */
+h1,
+h2,
+h3 {
+  line-height: 1.18;
+}
+
+h1 {
+  margin: 0 0 var(--space-4);
+  font-size: clamp(2rem, 3vw, 3rem);
+  letter-spacing: 0;
+}
+
+h2 {
+  margin-block: 0 var(--space-3);
+  font-size: 1.35rem;
+  letter-spacing: 0;
+}
+
+h3 {
+  font-size: 1.05rem;
+  letter-spacing: 0;
+}
+
+p {
+  max-width: 72ch;
+}
+</style>
+  <style>
+/* Shared button states and primary action variants. */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-1);
+  background: var(--surface, var(--bg));
+  color: var(--fg);
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.55rem 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--border) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  box-shadow: none;
+  transform: translateY(0);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+button[data-import-any],
+button[data-empty-add],
+button[data-search-submit],
+button[data-open-library],
+button[data-save-changes],
+button[data-find-replace-apply],
+button[data-pat-verify],
+button[data-gitcite-dialog-close] + button,
+form button[type="submit"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+button[data-import-any]:hover:not(:disabled),
+button[data-empty-add]:hover:not(:disabled),
+button[data-search-submit]:hover:not(:disabled),
+button[data-open-library]:hover:not(:disabled),
+button[data-save-changes]:hover:not(:disabled),
+button[data-find-replace-apply]:hover:not(:disabled),
+button[data-pat-verify]:hover:not(:disabled),
+button[data-gitcite-dialog-close] + button:hover:not(:disabled),
+form button[type="submit"]:hover:not(:disabled),
+[data-sidebar-save-to-computer]:hover:not(:disabled),
+[data-sidebar-save-now]:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+button[data-import-any]:disabled,
+button[data-empty-add]:disabled,
+button[data-search-submit]:disabled,
+button[data-open-library]:disabled,
+button[data-save-changes]:disabled,
+button[data-find-replace-apply]:disabled,
+button[data-pat-verify]:disabled,
+form button[type="submit"]:disabled,
+[data-sidebar-save-to-computer]:disabled,
+[data-sidebar-save-now]:disabled {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: var(--fg-muted);
+}
+
+button[data-empty-load],
+button[data-search-clear],
+button[data-gitcite-dialog-close] {
+  background: var(--surface, var(--bg));
+  color: var(--fg);
+}
+</style>
+  <style>
+/* Links and form controls. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+label {
+  color: var(--fg);
+  font-weight: 650;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-1);
+  background: var(--surface, var(--bg));
+  color: var(--fg);
+  padding: 0.58rem 0.7rem;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto !important;
+  height: auto;
+  inline-size: auto !important;
+  block-size: auto;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: color-mix(in srgb, var(--fg-muted) 82%, transparent);
+}
+
+fieldset {
+  background: var(--surface, var(--bg));
+}
+</style>
+  <style>
+/* Generic table surface defaults. */
+table {
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+th {
+  background: var(--surface-strong, var(--bg-elevated));
+  color: var(--fg);
+}
+
+td {
+  border-block-end: 1px solid var(--border-subtle, var(--border));
+  color: var(--fg);
+}
+
+tr:hover td {
+  background: var(--bg-elevated);
+}
+</style>
+  <style>
+/* Native dialog shell and dialog body primitives. */
+dialog {
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: min(84vh, 54rem);
+  padding: var(--space-5);
+  background: var(--surface, var(--bg));
+  color: var(--fg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-dialog);
+}
+
+dialog:has(#settings-desc) {
+  width: min(54rem, calc(100vw - 2rem));
+}
+
+dialog:has(#about-desc) {
+  width: min(48rem, calc(100vw - 2rem));
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+[data-gitcite-dialog-header] {
+  padding-block-end: var(--space-3);
+  margin-block-end: var(--space-4);
+  border-block-end: 1px solid var(--border-subtle, var(--border));
+}
+
+.gitcite-dialog-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.gitcite-dialog-body > section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.gitcite-dialog-body > section h3,
+.gitcite-dialog-body > section p {
+  margin-block: 0 !important;
+}
+
+.gitcite-dialog-body > section > button {
+  justify-self: start;
+}
+
+.gitcite-dialog-body fieldset {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  padding: var(--space-3) !important;
+  border-color: var(--border-subtle, var(--border)) !important;
+  border-radius: var(--radius-2) !important;
+}
+
+.gitcite-dialog-body fieldset label {
+  display: inline-flex !important;
+  justify-content: flex-start;
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+}
+
+.gitcite-dialog-body fieldset input[type="radio"] {
+  width: 1rem !important;
+  height: 1rem !important;
+  inline-size: 1rem !important;
+  block-size: 1rem !important;
+  min-inline-size: 1rem !important;
+  min-block-size: 1rem !important;
+}
+</style>
+  <style>
+/* Field primitive, help text, and error summary. */
+.gitcite-field {
+  display: grid;
+  gap: var(--space-1);
+  margin-block-end: var(--space-3);
+}
+
+.gitcite-field-help {
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+
+.gitcite-field-error,
+.gitcite-error-summary {
+  color: var(--danger);
+}
+
+.gitcite-error-summary {
+  padding: var(--space-3);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-2);
+}
+</style>
+  <style>
+/* Settings reorderable list rows. */
+[role="list"][aria-label="Library columns"],
+[role="list"][aria-label="Default add-citation fields"] {
+  gap: var(--space-2) !important;
+  padding: var(--space-3) !important;
+  border-color: var(--border-subtle, var(--border)) !important;
+  border-radius: var(--radius-2) !important;
+  background: var(--surface, var(--bg));
+}
+
+[role="list"][aria-label="Library columns"] > [role="listitem"],
+[role="list"][aria-label="Default add-citation fields"] > [role="listitem"] {
+  display: grid !important;
+  grid-template-columns: 4.5rem minmax(16rem, 1fr) 6.5rem 7.5rem;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  padding: var(--space-2) !important;
+  border-color: var(--border-subtle, var(--border)) !important;
+  background: var(--bg);
+}
+
+[role="list"][aria-label="Library columns"] [data-vis-toggle],
+[role="list"][aria-label="Default add-citation fields"] [data-vis-toggle] {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  inline-size: 1.25rem !important;
+  block-size: 1.25rem !important;
+}
+
+[role="list"][aria-label="Library columns"] label,
+[role="list"][aria-label="Default add-citation fields"] label {
+  display: grid !important;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  min-width: 0;
+}
+
+[role="list"][aria-label="Library columns"] label,
+[role="list"][aria-label="Default add-citation fields"] label,
+[role="list"][aria-label="Library columns"] button,
+[role="list"][aria-label="Default add-citation fields"] button {
+  margin: 0;
+}
+</style>
+  <style>
+/* Header toolbar and active-view marker. */
+[role="toolbar"] {
+  padding: var(--space-1);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  background: var(--surface, var(--bg));
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.06);
+}
+
+[role="toolbar"] [data-toolbar-item] {
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.925rem;
+}
+
+[role="toolbar"] [data-toolbar-item]:hover:not(:disabled),
+[role="toolbar"] [data-toolbar-item][aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--fg);
 }
 
 /* Phase 17 #10 — visible "active view" marker on the toolbar button
@@ -158,10 +666,556 @@ html, body {
   font-weight: 700;
   box-shadow: inset 0 -3px 0 var(--focus-ring);
 }
+</style>
+  <style>
+/* Landing and empty-library surfaces. */
+[aria-label="Library import"] {
+  max-width: 48rem;
+  margin: min(8vh, 5rem) auto 0;
+  padding: clamp(var(--space-5), 4vw, 3rem);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-soft);
+}
 
-/* .gitcite-sr-h1 lives in hit-area.css (single source of truth — the
-   clip:rect strategy). Phase 17 a11y-review m2 removed the duplicate
-   from this file. */
+main > section[aria-labelledby] {
+  max-width: 52rem;
+  padding: clamp(var(--space-5), 4vw, 3rem);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-soft);
+}
+
+[data-drop-zone] {
+  background:
+    linear-gradient(135deg, var(--surface-strong, var(--bg-elevated)), var(--surface, var(--bg)));
+}
+
+[data-drop-zone]:hover {
+  border-color: var(--focus-ring);
+  color: var(--fg);
+}
+</style>
+  <style>
+/* Library page search and grid/table presentation. */
+main:has(table[role="grid"]) {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+main:has(table[role="grid"]) > div {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: calc(100vh - 8.5rem) !important;
+  min-height: 36rem;
+  gap: var(--space-4) !important;
+}
+
+main:has(table[role="grid"]) > div > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+main:has(table[role="grid"]) div:has(> table[role="grid"]) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: auto !important;
+  border-radius: var(--radius-2);
+}
+
+main:has(table[role="grid"]) .gitcite-search {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-block-end: 0;
+}
+
+main:has(table[role="grid"]) .gitcite-search label {
+  font-size: 0.95rem;
+}
+
+table[role="grid"] {
+  border-collapse: separate !important;
+  border-spacing: 0;
+  font-size: 0.925rem;
+}
+
+table[role="grid"] thead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+table[role="grid"] th {
+  padding: 0.8rem 0.9rem !important;
+  background: var(--surface-strong, var(--bg-elevated));
+  border-block-end: 1px solid var(--border) !important;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+table[role="grid"] td {
+  padding: 0.9rem !important;
+  border-block-end: 1px solid var(--border-subtle, var(--border)) !important;
+  color: var(--fg);
+  line-height: 1.35;
+}
+
+table[role="grid"] tbody tr {
+  background: var(--surface, var(--bg));
+}
+
+table[role="grid"] tbody tr:nth-child(even of tr[data-row]) {
+  background: color-mix(in srgb, var(--bg-elevated) 45%, var(--surface, var(--bg)));
+}
+
+table[role="grid"] tbody tr:hover td,
+table[role="grid"] tbody tr:focus-within td {
+  background: var(--accent-soft);
+}
+
+table[role="grid"] [data-col-key="year"],
+table[role="grid"] [data-col-key="volume"],
+table[role="grid"] [data-col-key="number"],
+table[role="grid"] [data-col-key="saved"],
+table[role="grid"] [data-col-key="datasource"] {
+  text-align: center;
+}
+
+table[role="grid"] [data-col-key="title"],
+table[role="grid"] [data-col-key="author"],
+table[role="grid"] [data-col-key="journal"],
+table[role="grid"] [data-col-key="booktitle"] {
+  white-space: normal;
+}
+
+[data-grid-primary] {
+  display: block;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+[data-grid-pill] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 4.5rem;
+  max-inline-size: 100%;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[data-grid-pill="saved"] {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border-subtle, var(--border)));
+  background: color-mix(in srgb, var(--success) 14%, var(--surface, var(--bg)));
+}
+
+.gitcite-search {
+  padding: var(--space-4);
+  margin-block-end: var(--space-3);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-soft);
+}
+
+[data-virtual-list] {
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+[data-virtual-list] [role="listitem"]:hover {
+  background: var(--bg-elevated);
+}
+</style>
+  <style>
+/* Library sidebar filters and file actions. */
+[data-sidebar-actions] {
+  display: grid !important;
+  gap: var(--space-3) !important;
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-subtle, var(--border));
+}
+
+nav [data-filters-disclosure] {
+  width: 100%;
+  justify-content: space-between;
+  background: var(--surface-strong, var(--bg-elevated));
+}
+
+nav [data-filters-region] {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-3);
+}
+
+nav [data-filters-region] fieldset {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+}
+
+nav [data-filters-region] legend {
+  padding-inline: var(--space-1);
+  font-weight: 700;
+}
+
+nav [data-filters-region] label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: 2rem;
+}
+
+[data-sidebar-actions] p {
+  margin: 0 !important;
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+[data-sidebar-actions] > p:first-child {
+  padding: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+}
+
+[data-sidebar-actions] button {
+  width: 100%;
+  justify-content: flex-start;
+  min-inline-size: 0 !important;
+  padding-block: 0.75rem;
+  text-align: left !important;
+  white-space: normal;
+}
+
+[data-sidebar-save-to-computer],
+[data-sidebar-save-now] {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-fg) !important;
+}
+
+[data-sidebar-export],
+[data-sidebar-import],
+[data-sidebar-disconnect] {
+  background: var(--surface, var(--bg)) !important;
+}
+
+[data-sidebar-export] + p,
+[data-sidebar-import] + input + p {
+  margin-block-start: calc(-1 * var(--space-2)) !important;
+  padding-inline: var(--space-1);
+}
+
+[data-sidebar-import] {
+  margin-block-start: var(--space-1);
+}
+</style>
+  <style>
+/* Add/edit citation form layout. */
+main > div:has(form[aria-label="Edit entry"]) {
+  max-width: 64rem;
+  padding: clamp(var(--space-5), 4vw, 2.5rem);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-soft);
+}
+
+form[aria-label="Edit entry"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+form[aria-label="Edit entry"] > section {
+  display: inline-grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+form[aria-label="Edit entry"] > section:has(> div:not([hidden])) {
+  flex: 1 0 100%;
+}
+
+form[aria-label="Edit entry"] > section > button[aria-expanded] {
+  justify-content: flex-start;
+  justify-self: start;
+  min-inline-size: 0 !important;
+  background: var(--surface, var(--bg));
+}
+
+form[aria-label="Edit entry"] > section > button[aria-expanded="true"] {
+  background: var(--surface-strong, var(--bg-elevated));
+  border-color: var(--border);
+  box-shadow: inset 4px 0 0 var(--focus-ring);
+}
+
+form[aria-label="Edit entry"] > section > div:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(14rem, 1fr));
+  justify-items: stretch;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+}
+
+form[aria-label="Edit entry"] > section > div:not([hidden]) > label,
+form[aria-label="Edit entry"] > section > div:not([hidden]) > select,
+form[aria-label="Edit entry"] > section > div:not([hidden]) > .gitcite-field,
+form[aria-label="Edit entry"] > section > div:not([hidden]) > div,
+form[aria-label="Edit entry"] > section > div:not([hidden]) > button {
+  grid-column: auto;
+}
+
+form[aria-label="Edit entry"] > section > div:not([hidden]) > button {
+  justify-self: start;
+  min-inline-size: 11rem !important;
+  width: auto;
+}
+
+form[aria-label="Edit entry"] > section > div:not([hidden]) > label:first-child,
+form[aria-label="Edit entry"] > section > div:not([hidden]) > label:first-child + select,
+form[aria-label="Edit entry"] .gitcite-field:has(textarea),
+form[aria-label="Edit entry"] [data-custom-list],
+form[aria-label="Edit entry"] [data-custom-list] + button {
+  grid-column: 1 / -1;
+}
+
+form[aria-label="Edit entry"] > section > div:not([hidden]) > label:first-child {
+  margin-block-end: calc(-1 * var(--space-2));
+}
+
+form[aria-label="Edit entry"] .gitcite-field {
+  margin-block-end: 0;
+}
+
+form[aria-label="Edit entry"] > div:last-child {
+  flex: 1 0 100%;
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: var(--space-3) !important;
+  align-items: center;
+  justify-content: flex-start;
+  margin-block-start: var(--space-2) !important;
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-subtle, var(--border));
+}
+</style>
+  <style>
+/* About modal content and privacy table. */
+dialog:has(#about-desc) .gitcite-dialog-body {
+  gap: var(--space-5);
+}
+
+#about-desc {
+  max-width: none;
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  font-size: 1.02rem;
+}
+
+dialog:has(#about-desc) h3 {
+  margin: 0;
+}
+
+[data-about-features] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: 0;
+  margin: calc(-1 * var(--space-3)) 0 0;
+  list-style: none;
+}
+
+[data-about-features] li {
+  position: relative;
+  padding: var(--space-3) var(--space-3) var(--space-3) 2.1rem;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+}
+
+[data-about-features] li::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 1.15rem;
+  inset-inline-start: var(--space-3);
+  inline-size: 0.55rem;
+  block-size: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+dialog:has(#about-desc) table {
+  display: block;
+  max-height: 18rem;
+  overflow: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  box-shadow: none;
+}
+
+dialog:has(#about-desc) caption {
+  caption-side: top;
+  padding: var(--space-2) var(--space-3);
+  color: var(--fg-muted);
+  text-align: left;
+  font-weight: 650;
+}
+
+dialog:has(#about-desc) th,
+dialog:has(#about-desc) td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+}
+
+dialog:has(#about-desc) th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-strong, var(--bg-elevated));
+}
+
+dialog:has(#about-desc) tbody tr:nth-child(even) td {
+  background: var(--bg-elevated);
+}
+</style>
+  <style>
+/* Keyboard shortcuts modal table. */
+table[data-shortcuts-table] {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  box-shadow: none;
+}
+
+table[data-shortcuts-table] caption {
+  padding: var(--space-2) var(--space-3);
+  color: var(--fg-muted);
+  text-align: left;
+  font-weight: 650;
+}
+
+table[data-shortcuts-table] th,
+table[data-shortcuts-table] td {
+  padding: var(--space-3);
+  text-align: left;
+}
+
+table[data-shortcuts-table] th {
+  background: var(--surface-strong, var(--bg-elevated));
+  border-block-end: 1px solid var(--border);
+}
+
+table[data-shortcuts-table] td:first-child {
+  width: 12rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  font-weight: 700;
+}
+
+table[data-shortcuts-table] tbody tr:nth-child(even) td {
+  background: var(--bg-elevated);
+}
+</style>
+  <style>
+/* Cross-view responsive layout rules. */
+@media (max-width: 900px) {
+  body,
+  body:has(nav:not([hidden])),
+  body:has(nav[hidden]) {
+    grid-template:
+      "header" auto
+      "nav" auto
+      "main" minmax(0, 1fr)
+      "footer" auto / minmax(0, 1fr);
+  }
+
+  header {
+    position: static;
+    flex-wrap: wrap;
+  }
+
+  header [data-toolbar-host] {
+    flex-basis: 100%;
+    order: 10;
+  }
+
+  nav {
+    position: static;
+    max-height: none;
+    margin: var(--space-4) clamp(var(--space-4), 3vw, var(--space-6)) 0;
+  }
+
+  main {
+    width: 100%;
+    padding-block-start: var(--space-4);
+  }
+}
+
+@media (max-width: 560px) {
+  header,
+  main,
+  footer {
+    padding-inline: var(--space-3);
+  }
+
+  nav {
+    margin-inline: var(--space-3);
+  }
+
+  [role="toolbar"] {
+    width: 100%;
+  }
+
+  [role="toolbar"] [data-toolbar-item] {
+    flex: 1 1 9rem;
+  }
+
+  [aria-label="Library import"] {
+    margin-block-start: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  button[data-empty-start] {
+    margin-inline-start: 0 !important;
+    margin-block-start: var(--space-2);
+  }
+
+  form[aria-label="Edit entry"] > section > div:not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-about-features] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 </style>
   <style>
 /* Phase 1.H — hit-area utility. WCAG 2.5.5 (Target Size — Enhanced AAA).
@@ -3686,6 +4740,24 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
   // when settings.js isn't loaded (component tests, etc.).
   const DEFAULT_COLUMN_NAMES = ['title', 'author', 'year', 'type', 'datasource', 'saved'];
   const ALL_COLUMNS = DEFAULT_COLUMN_NAMES.map(columnFor);
+  const COLUMN_WIDTHS = {
+    title: 360,
+    author: 260,
+    journal: 260,
+    booktitle: 260,
+    abstract: 340,
+    note: 260,
+    url: 260,
+    doi: 210,
+    key: 190,
+    type: 140,
+    datasource: 140,
+    saved: 120,
+    year: 96,
+    volume: 96,
+    number: 96,
+    pages: 110,
+  };
   let COLUMNS = ALL_COLUMNS.slice();
   const ROW_HEIGHT = 56;
   const HEADER_ROW = -1;
@@ -3729,6 +4801,14 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
 
   function ids() { return globalThis.GitCiteIds; }
 
+  function columnWidth(col) {
+    return COLUMN_WIDTHS[col.key] || 180;
+  }
+
+  function tableMinWidth() {
+    return COLUMNS.reduce((sum, col) => sum + columnWidth(col), 0);
+  }
+
   function mount(host, opts) {
     _opts = opts || {};
     _host = host;
@@ -3747,7 +4827,7 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
     table.setAttribute('aria-readonly', 'true');
     table.setAttribute('aria-labelledby', captionId);
     table.setAttribute('aria-colcount', String(COLUMNS.length));
-    table.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed;';
+    table.style.cssText = `width:max(100%, ${tableMinWidth()}px);min-width:${tableMinWidth()}px;border-collapse:collapse;table-layout:fixed;`;
 
     const caption = document.createElement('caption');
     caption.id = captionId;
@@ -3756,9 +4836,10 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
     table.appendChild(caption);
 
     const colgroup = document.createElement('colgroup');
-    COLUMNS.forEach(() => {
+    COLUMNS.forEach((col) => {
       const c = document.createElement('col');
-      c.style.minWidth = '120px';
+      c.setAttribute('data-col-key', col.key);
+      c.style.width = columnWidth(col) + 'px';
       colgroup.appendChild(c);
     });
     table.appendChild(colgroup);
@@ -3780,6 +4861,7 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
       h.setAttribute('tabindex', i === 0 ? '0' : '-1');
       h.setAttribute('data-row', String(HEADER_ROW));
       h.setAttribute('data-col', String(i));
+      h.setAttribute('data-col-key', col.key);
       h.style.cssText = 'min-block-size:44px;padding:0.5rem;font-weight:600;cursor:pointer;user-select:none;text-align:start;border-block-end:2px solid var(--border);';
       const label = document.createElement('span');
       label.textContent = col.label;
@@ -4184,10 +5266,25 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
       cell.setAttribute('aria-colindex', String(ci + 1));
       cell.setAttribute('data-row', String(i));
       cell.setAttribute('data-col', String(ci));
+      cell.setAttribute('data-col-key', col.key);
       const tabbable = (i === _focusRow && ci === _focusCol);
       cell.setAttribute('tabindex', tabbable ? '0' : '-1');
-      cell.style.cssText = `padding:0.5rem;min-width:120px;min-block-size:44px;cursor:pointer;vertical-align:middle;`;
-      cell.textContent = col.get(entry);
+      cell.style.cssText = `padding:0.5rem;min-width:${columnWidth(col)}px;min-block-size:44px;cursor:pointer;vertical-align:middle;`;
+      const value = col.get(entry);
+      cell.title = value;
+      if (col.key === 'title') {
+        const strong = document.createElement('strong');
+        strong.setAttribute('data-grid-primary', '');
+        strong.textContent = value;
+        cell.appendChild(strong);
+      } else if (col.key === 'type' || col.key === 'saved' || col.key === 'datasource') {
+        const pill = document.createElement('span');
+        pill.setAttribute('data-grid-pill', col.key);
+        pill.textContent = value || '—';
+        cell.appendChild(pill);
+      } else {
+        cell.textContent = value;
+      }
       row.appendChild(cell);
     });
     return row;
@@ -7335,6 +8432,7 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
 
     const apply = document.createElement('button');
     apply.type = 'button';
+    apply.setAttribute('data-find-replace-apply', '');
     apply.textContent = 'Apply';
     apply.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-end:0.5rem;';
     body.appendChild(apply);
@@ -7403,6 +8501,7 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
     }
 
     const table = document.createElement('table');
+    table.setAttribute('data-shortcuts-table', '');
     const cap = document.createElement('caption');
     cap.textContent = 'Keyboard shortcuts';
     table.appendChild(cap);
@@ -7689,6 +8788,7 @@ globalThis.GITCITE_CONFIG = GITCITE_CONFIG;
 
     const verify = document.createElement('button');
     verify.type = 'button';
+    verify.setAttribute('data-pat-verify', '');
     verify.textContent = 'Verify and save';
     verify.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-end:0.5rem;';
     verify.addEventListener('click', async () => {

@@ -38,6 +38,7 @@
 
     const apply = document.createElement('button');
     apply.type = 'button';
+    apply.setAttribute('data-find-replace-apply', '');
     apply.textContent = 'Apply';
     apply.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-end:0.5rem;';
     body.appendChild(apply);

@@ -1,0 +1,86 @@
+/* Library sidebar filters and file actions. */
+[data-sidebar-actions] {
+  display: grid !important;
+  gap: var(--space-3) !important;
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-subtle, var(--border));
+}
+
+nav [data-filters-disclosure] {
+  width: 100%;
+  justify-content: space-between;
+  background: var(--surface-strong, var(--bg-elevated));
+}
+
+nav [data-filters-region] {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-3);
+}
+
+nav [data-filters-region] fieldset {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+}
+
+nav [data-filters-region] legend {
+  padding-inline: var(--space-1);
+  font-weight: 700;
+}
+
+nav [data-filters-region] label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: 2rem;
+}
+
+[data-sidebar-actions] p {
+  margin: 0 !important;
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+[data-sidebar-actions] > p:first-child {
+  padding: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+}
+
+[data-sidebar-actions] button {
+  width: 100%;
+  justify-content: flex-start;
+  min-inline-size: 0 !important;
+  padding-block: 0.75rem;
+  text-align: left !important;
+  white-space: normal;
+}
+
+[data-sidebar-save-to-computer],
+[data-sidebar-save-now] {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-fg) !important;
+}
+
+[data-sidebar-export],
+[data-sidebar-import],
+[data-sidebar-disconnect] {
+  background: var(--surface, var(--bg)) !important;
+}
+
+[data-sidebar-export] + p,
+[data-sidebar-import] + input + p {
+  margin-block-start: calc(-1 * var(--space-2)) !important;
+  padding-inline: var(--space-1);
+}
+
+[data-sidebar-import] {
+  margin-block-start: var(--space-1);
+}

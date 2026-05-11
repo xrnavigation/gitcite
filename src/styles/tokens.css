@@ -8,6 +8,17 @@
   color-scheme: light dark;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --radius-1: 4px;
+  --radius-2: 8px;
+  --radius-3: 12px;
+  --shadow-soft: 0 16px 36px rgba(24, 24, 27, 0.10);
+  --shadow-dialog: 0 24px 70px rgba(24, 24, 27, 0.26);
 }
 
 :root[data-theme="light"] {
@@ -26,6 +37,12 @@
   --warning: #713f12;
   --warning-fg: #ffffff;
   --focus-ring: #1e40af;
+  --bg-page: #f8fafc;
+  --surface: #ffffff;
+  --surface-strong: #f4f4f5;
+  --border-subtle: #d4d4d8;
+  --accent-soft: #dbeafe;
+  --danger-soft: #fee2e2;
 }
 
 :root[data-theme="dark"] {
@@ -44,6 +61,14 @@
   --warning: #fde68a;
   --warning-fg: #0a0a0b;
   --focus-ring: #bfdbfe;
+  --bg-page: #050506;
+  --surface: #101013;
+  --surface-strong: #18181b;
+  --border-subtle: #3f3f46;
+  --accent-soft: #172554;
+  --danger-soft: #450a0a;
+  --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.42);
+  --shadow-dialog: 0 24px 70px rgba(0, 0, 0, 0.58);
 }
 
 /* Hard-contrast backstop. If any token is below 7:1 in its base form, override
@@ -75,66 +100,3 @@
     scroll-behavior: auto !important;
   }
 }
-
-/* Base body styling — minimal in Phase 1.A; component CSS lands per phase. */
-html, body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  margin: 0;
-}
-
-/* Skip link — visible on focus only. Always reachable for keyboard users. */
-.skip-link {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  background: var(--bg);
-  color: var(--fg);
-  padding: 0.75rem 1rem;
-  text-decoration: underline;
-  z-index: 9999;
-}
-.skip-link:focus {
-  left: 0.5rem;
-  top: 0.5rem;
-}
-
-/* Focus appearance — >= 2 CSS px ring, >= 3:1 contrast (2.4.13).
-   :focus-visible only so mouse clicks do not show the ring. */
-:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring);
-  outline-offset: var(--focus-ring-offset);
-}
-
-/* Theme toggle styling — header sun/moon button. Phase 1.A delivers a
-   text-only button; iconography lands later. */
-.theme-toggle {
-  background: var(--bg-elevated);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
-  font-size: 1rem;
-  cursor: pointer;
-  min-block-size: 44px;
-  min-inline-size: 44px;
-}
-.theme-toggle:hover {
-  background: var(--bg-sunken);
-}
-
-/* Phase 17 #10 — visible "active view" marker on the toolbar button
-   whose view is currently rendered. aria-current="page" supplies the
-   semantic; the bottom border + bold weight supply the visual cue.
-   Contrast is preserved by using --focus-ring (3:1+ in both themes). */
-[role="toolbar"] [data-toolbar-item][aria-current="page"] {
-  font-weight: 700;
-  box-shadow: inset 0 -3px 0 var(--focus-ring);
-}
-
-/* .gitcite-sr-h1 lives in hit-area.css (single source of truth — the
-   clip:rect strategy). Phase 17 a11y-review m2 removed the duplicate
-   from this file. */

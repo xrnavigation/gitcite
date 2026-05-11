@@ -1,0 +1,71 @@
+/* Cross-view responsive layout rules. */
+@media (max-width: 900px) {
+  body,
+  body:has(nav:not([hidden])),
+  body:has(nav[hidden]) {
+    grid-template:
+      "header" auto
+      "nav" auto
+      "main" minmax(0, 1fr)
+      "footer" auto / minmax(0, 1fr);
+  }
+
+  header {
+    position: static;
+    flex-wrap: wrap;
+  }
+
+  header [data-toolbar-host] {
+    flex-basis: 100%;
+    order: 10;
+  }
+
+  nav {
+    position: static;
+    max-height: none;
+    margin: var(--space-4) clamp(var(--space-4), 3vw, var(--space-6)) 0;
+  }
+
+  main {
+    width: 100%;
+    padding-block-start: var(--space-4);
+  }
+}
+
+@media (max-width: 560px) {
+  header,
+  main,
+  footer {
+    padding-inline: var(--space-3);
+  }
+
+  nav {
+    margin-inline: var(--space-3);
+  }
+
+  [role="toolbar"] {
+    width: 100%;
+  }
+
+  [role="toolbar"] [data-toolbar-item] {
+    flex: 1 1 9rem;
+  }
+
+  [aria-label="Library import"] {
+    margin-block-start: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  button[data-empty-start] {
+    margin-inline-start: 0 !important;
+    margin-block-start: var(--space-2);
+  }
+
+  form[aria-label="Edit entry"] > section > div:not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-about-features] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

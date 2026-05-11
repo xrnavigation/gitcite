@@ -145,6 +145,7 @@
 
     const verify = document.createElement('button');
     verify.type = 'button';
+    verify.setAttribute('data-pat-verify', '');
     verify.textContent = 'Verify and save';
     verify.style.cssText = 'min-block-size:44px;min-inline-size:44px;margin-inline-end:0.5rem;';
     verify.addEventListener('click', async () => {

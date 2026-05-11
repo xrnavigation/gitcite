@@ -1,0 +1,75 @@
+/* Native dialog shell and dialog body primitives. */
+dialog {
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: min(84vh, 54rem);
+  padding: var(--space-5);
+  background: var(--surface, var(--bg));
+  color: var(--fg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-dialog);
+}
+
+dialog:has(#settings-desc) {
+  width: min(54rem, calc(100vw - 2rem));
+}
+
+dialog:has(#about-desc) {
+  width: min(48rem, calc(100vw - 2rem));
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+[data-gitcite-dialog-header] {
+  padding-block-end: var(--space-3);
+  margin-block-end: var(--space-4);
+  border-block-end: 1px solid var(--border-subtle, var(--border));
+}
+
+.gitcite-dialog-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.gitcite-dialog-body > section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.gitcite-dialog-body > section h3,
+.gitcite-dialog-body > section p {
+  margin-block: 0 !important;
+}
+
+.gitcite-dialog-body > section > button {
+  justify-self: start;
+}
+
+.gitcite-dialog-body fieldset {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  padding: var(--space-3) !important;
+  border-color: var(--border-subtle, var(--border)) !important;
+  border-radius: var(--radius-2) !important;
+}
+
+.gitcite-dialog-body fieldset label {
+  display: inline-flex !important;
+  justify-content: flex-start;
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+}
+
+.gitcite-dialog-body fieldset input[type="radio"] {
+  width: 1rem !important;
+  height: 1rem !important;
+  inline-size: 1rem !important;
+  block-size: 1rem !important;
+  min-inline-size: 1rem !important;
+  min-block-size: 1rem !important;
+}

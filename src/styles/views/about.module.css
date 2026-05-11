@@ -1,0 +1,81 @@
+/* About modal content and privacy table. */
+dialog:has(#about-desc) .gitcite-dialog-body {
+  gap: var(--space-5);
+}
+
+#about-desc {
+  max-width: none;
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  font-size: 1.02rem;
+}
+
+dialog:has(#about-desc) h3 {
+  margin: 0;
+}
+
+[data-about-features] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: 0;
+  margin: calc(-1 * var(--space-3)) 0 0;
+  list-style: none;
+}
+
+[data-about-features] li {
+  position: relative;
+  padding: var(--space-3) var(--space-3) var(--space-3) 2.1rem;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+}
+
+[data-about-features] li::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 1.15rem;
+  inset-inline-start: var(--space-3);
+  inline-size: 0.55rem;
+  block-size: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+dialog:has(#about-desc) table {
+  display: block;
+  max-height: 18rem;
+  overflow: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  box-shadow: none;
+}
+
+dialog:has(#about-desc) caption {
+  caption-side: top;
+  padding: var(--space-2) var(--space-3);
+  color: var(--fg-muted);
+  text-align: left;
+  font-weight: 650;
+}
+
+dialog:has(#about-desc) th,
+dialog:has(#about-desc) td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+}
+
+dialog:has(#about-desc) th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-strong, var(--bg-elevated));
+}
+
+dialog:has(#about-desc) tbody tr:nth-child(even) td {
+  background: var(--bg-elevated);
+}

@@ -1,0 +1,142 @@
+/* Library page search and grid/table presentation. */
+main:has(table[role="grid"]) {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+main:has(table[role="grid"]) > div {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: calc(100vh - 8.5rem) !important;
+  min-height: 36rem;
+  gap: var(--space-4) !important;
+}
+
+main:has(table[role="grid"]) > div > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+main:has(table[role="grid"]) div:has(> table[role="grid"]) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: auto !important;
+  border-radius: var(--radius-2);
+}
+
+main:has(table[role="grid"]) .gitcite-search {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-block-end: 0;
+}
+
+main:has(table[role="grid"]) .gitcite-search label {
+  font-size: 0.95rem;
+}
+
+table[role="grid"] {
+  border-collapse: separate !important;
+  border-spacing: 0;
+  font-size: 0.925rem;
+}
+
+table[role="grid"] thead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+table[role="grid"] th {
+  padding: 0.8rem 0.9rem !important;
+  background: var(--surface-strong, var(--bg-elevated));
+  border-block-end: 1px solid var(--border) !important;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+table[role="grid"] td {
+  padding: 0.9rem !important;
+  border-block-end: 1px solid var(--border-subtle, var(--border)) !important;
+  color: var(--fg);
+  line-height: 1.35;
+}
+
+table[role="grid"] tbody tr {
+  background: var(--surface, var(--bg));
+}
+
+table[role="grid"] tbody tr:nth-child(even of tr[data-row]) {
+  background: color-mix(in srgb, var(--bg-elevated) 45%, var(--surface, var(--bg)));
+}
+
+table[role="grid"] tbody tr:hover td,
+table[role="grid"] tbody tr:focus-within td {
+  background: var(--accent-soft);
+}
+
+table[role="grid"] [data-col-key="year"],
+table[role="grid"] [data-col-key="volume"],
+table[role="grid"] [data-col-key="number"],
+table[role="grid"] [data-col-key="saved"],
+table[role="grid"] [data-col-key="datasource"] {
+  text-align: center;
+}
+
+table[role="grid"] [data-col-key="title"],
+table[role="grid"] [data-col-key="author"],
+table[role="grid"] [data-col-key="journal"],
+table[role="grid"] [data-col-key="booktitle"] {
+  white-space: normal;
+}
+
+[data-grid-primary] {
+  display: block;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+[data-grid-pill] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 4.5rem;
+  max-inline-size: 100%;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[data-grid-pill="saved"] {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border-subtle, var(--border)));
+  background: color-mix(in srgb, var(--success) 14%, var(--surface, var(--bg)));
+}
+
+.gitcite-search {
+  padding: var(--space-4);
+  margin-block-end: var(--space-3);
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-soft);
+}
+
+[data-virtual-list] {
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+[data-virtual-list] [role="listitem"]:hover {
+  background: var(--bg-elevated);
+}
